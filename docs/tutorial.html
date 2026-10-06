@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Tutorial · mutablelib</title>
+<title>Tutorial · partials</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="page">
 <nav>
-  <div class="title">mutablelib</div>
+  <div class="title">partials</div>
   <a href="index.html">Overview</a>
   <a href="setup.html">Getting started</a>
   <a href="tutorial.html" class="here">Tutorial</a>
@@ -27,9 +27,9 @@
 <main>
 
 <h1>Tutorial: your first module</h1>
-<p class="lede">Build a VCV Rack module from scratch with mutablelib: a sawtooth oscillator into a low-pass filter, with knobs for the oscillator's frequency and the filter's cutoff.</p>
+<p class="lede">Build a VCV Rack module from scratch with partials: a sawtooth oscillator into a low-pass filter, with knobs for the oscillator's frequency and the filter's cutoff.</p>
 
-<p>By the end you will have a working module in Rack and know the pattern every mutablelib module follows. It takes about 20 minutes. The finished plugin is in <code>examples/tutorial-plugin</code> if you want to compare.</p>
+<p>By the end you will have a working module in Rack and know the pattern every partials module follows. It takes about 20 minutes. The finished plugin is in <code>examples/tutorial-plugin</code> if you want to compare.</p>
 <p><strong>Before you start:</strong> install the build tools and the Rack SDK, and set <code>RACK_DIR</code>, as described in <a href="setup.html">Getting started</a> (steps 1 and 2). Check with:</p>
 <pre><code>ls $RACK_DIR/helper.py</code></pre>
 
@@ -39,10 +39,10 @@
          v                        v
    BasicOscillator  -------&gt;    Svf      -------&gt;  OUT jack
    (sawtooth)             (low-pass)</code></pre>
-<p>Two mutablelib components do the work:</p>
+<p>Two partials components do the work:</p>
 <ul>
-  <li><a href="plumbing.html#osc-basic"><code>ml::BasicOscillator</code></a>: an alias-free sawtooth.</li>
-  <li><a href="plumbing.html#filter-svf"><code>ml::Svf</code></a>: a state-variable filter, used here as a low-pass.</li>
+  <li><a href="plumbing.html#osc-basic"><code>pt::BasicOscillator</code></a>: an alias-free sawtooth.</li>
+  <li><a href="plumbing.html#filter-svf"><code>pt::Svf</code></a>: a state-variable filter, used here as a low-pass.</li>
 </ul>
 <p>Our code reads the knobs, passes their values to the components, and sends the result to the output, once per sample.</p>
 
@@ -67,17 +67,17 @@ Author []: Your Name
     plugin.cpp    registers the modules with Rack</code></pre>
 
 <!-- ===================================================================== -->
-<h2>Step 2: add mutablelib</h2>
-<p>mutablelib is header-only, so the plugin only needs to know where its <code>include</code> folder is. Put a copy of the library inside the plugin, in a <code>dep</code> (dependencies) folder:</p>
+<h2>Step 2: add partials</h2>
+<p>partials is header-only, so the plugin only needs to know where its <code>include</code> folder is. Put a copy of the library inside the plugin, in a <code>dep</code> (dependencies) folder:</p>
 <pre><code>cd MyFirstPlugin
 mkdir dep
-cp -r /path/to/mutablelib dep/mutablelib
+cp -r /path/to/partials dep/partials
 # or, if your plugin is a git repository, add it as a submodule:
-# git submodule add &lt;mutablelib repository URL&gt; dep/mutablelib</code></pre>
+# git submodule add &lt;partials repository URL&gt; dep/partials</code></pre>
 <p>Then open <code>Makefile</code> and change the empty <code>FLAGS +=</code> line to:</p>
-<pre><code># mutablelib is header-only: adding its include folder is all it needs.
-FLAGS += -Idep/mutablelib/include</code></pre>
-<p><code>-I</code> adds a folder to the compiler's search path, so <code>#include "ml/osc/basic.h"</code> finds <code>dep/mutablelib/include/ml/osc/basic.h</code>. There's nothing to compile or link separately.</p>
+<pre><code># partials is header-only: adding its include folder is all it needs.
+FLAGS += -Idep/partials/include</code></pre>
+<p><code>-I</code> adds a folder to the compiler's search path, so <code>#include "pt/osc/basic.h"</code> finds <code>dep/partials/include/pt/osc/basic.h</code>. There's nothing to compile or link separately.</p>
 
 <!-- ===================================================================== -->
 <h2>Step 3: draw the panel</h2>
@@ -142,14 +142,14 @@ Source file generated at src/SawFilter.cpp</code></pre>
 
 <h3>5a. Include the components</h3>
 <p>At the top of <code>src/SawFilter.cpp</code>, after <code>#include "plugin.hpp"</code>:</p>
-<pre><code>#include "ml/core/units.h"    // voltToHz(), kFreqC4
-#include "ml/filter/svf.h"     // ml::Svf
-#include "ml/osc/basic.h"      // ml::BasicOscillator</code></pre>
+<pre><code>#include "pt/core/units.h"    // voltToHz(), kFreqC4
+#include "pt/filter/svf.h"     // pt::Svf
+#include "pt/osc/basic.h"      // pt::BasicOscillator</code></pre>
 
 <h3>5b. Add them as members</h3>
 <p>Inside <code>struct SawFilter</code>, after the enums. They are ordinary member variables: no <code>new</code>, no pointers.</p>
-<pre><code>	ml::BasicOscillator oscillator;
-	ml::Svf filter;</code></pre>
+<pre><code>	pt::BasicOscillator oscillator;
+	pt::Svf filter;</code></pre>
 
 <h3>5c. Configure the knobs</h3>
 <p>Replace the two generated <code>configParam</code> lines in the constructor. Their arguments are: control, minimum, maximum, default, name, unit, then two numbers for how Rack <em>displays</em> the value (<code>multiplier × base<sup>value</sup></code>), so the tooltip shows Hz:</p>
@@ -157,18 +157,18 @@ Source file generated at src/SawFilter.cpp</code></pre>
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
 		// Frequency knob: -4..+4 octaves around C4. Rack shows it in Hz:
 		// 261.63 * 2^value, from 16 Hz to 4186 Hz.
-		configParam(FREQ_PARAM, -4.f, 4.f, 0.f, "Frequency", " Hz", 2.f, ml::kFreqC4);
+		configParam(FREQ_PARAM, -4.f, 4.f, 0.f, "Frequency", " Hz", 2.f, pt::kFreqC4);
 		// Cutoff knob: 0..1 mapped exponentially to 20 Hz..20 kHz. Rack
 		// shows it in Hz: 20 * 1000^value.
 		configParam(CUTOFF_PARAM, 0.f, 1.f, 0.5f, "Cutoff", " Hz", 1000.f, 20.f);
 		configOutput(OUT_OUTPUT, "Audio");
 
-		oscillator.setShape(ml::BasicOscillator::SAW);
+		oscillator.setShape(pt::BasicOscillator::SAW);
 	}</code></pre>
 <p>Both knobs are <em>exponential</em>: each step multiplies the frequency rather than adding to it. That matches how we hear pitch, where every octave sounds the same size, so the knobs feel even across their range.</p>
 
 <h3>5d. Initialise at the right sample rate</h3>
-<p>Every mutablelib component needs <code>init(sampleRate)</code> before use. Rack tells a module the sample rate through <code>onSampleRateChange</code>. It is called when the module is added and whenever you change the engine's sample rate, so it is the one place you need. Add it to <code>struct SawFilter</code>:</p>
+<p>Every partials component needs <code>init(sampleRate)</code> before use. Rack tells a module the sample rate through <code>onSampleRateChange</code>. It is called when the module is added and whenever you change the engine's sample rate, so it is the one place you need. Add it to <code>struct SawFilter</code>:</p>
 <pre><code>	// Called when the module is added and whenever the sample rate
 	// changes: the place to (re)initialise DSP components.
 	void onSampleRateChange(const SampleRateChangeEvent&amp; e) override {
@@ -181,7 +181,7 @@ Source file generated at src/SawFilter.cpp</code></pre>
 <pre><code>	// Called once per sample.
 	void process(const ProcessArgs&amp; args) override {
 		// 1. Read the knobs and convert them to Hz.
-		float frequency = ml::voltToHz(params[FREQ_PARAM].getValue());
+		float frequency = pt::voltToHz(params[FREQ_PARAM].getValue());
 		float cutoff = 20.f * std::pow(1000.f, params[CUTOFF_PARAM].getValue());
 
 		// 2. Oscillator: one sample of an alias-free sawtooth, about +-1.
@@ -198,7 +198,7 @@ Source file generated at src/SawFilter.cpp</code></pre>
 	}</code></pre>
 <p>Line by line:</p>
 <ul>
-  <li><strong>Units.</strong> mutablelib works in Hz and ±1; Rack works in volts. <code>ml::voltToHz()</code> turns the frequency knob's octaves into Hz (0 is C4, 261.63 Hz, and each +1 doubles it). The cutoff uses the same formula as its display.</li>
+  <li><strong>Units.</strong> partials works in Hz and ±1; Rack works in volts. <code>pt::voltToHz()</code> turns the frequency knob's octaves into Hz (0 is C4, 261.63 Hz, and each +1 doubles it). The cutoff uses the same formula as its display.</li>
   <li><strong>Setters, then <code>process()</code>.</strong> Every component works this way: set the parameters, then call <code>process()</code> once per sample. Setting them every sample is fine and keeps the knobs responsive.</li>
   <li><strong><code>filter.process(saw)</code></strong> returns all three outputs of the state-variable filter at once; <code>.lp</code> picks the low-pass. Try <code>.bp</code> (band-pass) or <code>.hp</code> (high-pass).</li>
   <li><strong>Scaling.</strong> The final <code>5.f *</code> converts the library's ±1 to Rack's ±5 V audio standard.</li>
@@ -222,14 +222,14 @@ Source file generated at src/SawFilter.cpp</code></pre>
 <p>Each of these is a few lines, and each uses the same pattern: add a control to the panel's components layer, regenerate or edit the code, then read it in <code>process()</code>.</p>
 <ul>
   <li><strong>A V/Oct input.</strong> Add a green circle with id <code>VOCT</code>, then add the input voltage to the knob before converting, so the module plays in tune from a sequencer:
-<pre><code>float frequency = ml::voltToHz(params[FREQ_PARAM].getValue() + inputs[VOCT_INPUT].getVoltage());</code></pre></li>
+<pre><code>float frequency = pt::voltToHz(params[FREQ_PARAM].getValue() + inputs[VOCT_INPUT].getVoltage());</code></pre></li>
   <li><strong>A resonance knob.</strong> Add a red circle with id <code>RES</code>, configured 0..1, and map it to Q:
 <pre><code>filter.setFrequency(cutoff, 0.5f + 15.f * params[RES_PARAM].getValue());</code></pre></li>
   <li><strong>Cutoff CV.</strong> Treat a 0..10 V input as an extra 0..1 on the knob:
-<pre><code>float k = ml::clamp(params[CUTOFF_PARAM].getValue() + inputs[CUTOFF_INPUT].getVoltage() / 10.f, 0.f, 1.f);
+<pre><code>float k = pt::clamp(params[CUTOFF_PARAM].getValue() + inputs[CUTOFF_INPUT].getVoltage() / 10.f, 0.f, 1.f);
 float cutoff = 20.f * std::pow(1000.f, k);</code></pre></li>
-  <li><strong>Other waveforms.</strong> <code>setShape(ml::BasicOscillator::SQUARE)</code>, or swap in a more unusual oscillator from the <a href="osc.html">Oscillators</a> page.</li>
-  <li><strong>An envelope.</strong> Add a gate input and an <a href="dynamics.html#dynamics-lpg">ml::LowPassGate</a> after the filter, and you have a complete voice.</li>
+  <li><strong>Other waveforms.</strong> <code>setShape(pt::BasicOscillator::SQUARE)</code>, or swap in a more unusual oscillator from the <a href="osc.html">Oscillators</a> page.</li>
+  <li><strong>An envelope.</strong> Add a gate input and an <a href="dynamics.html#dynamics-lpg">pt::LowPassGate</a> after the filter, and you have a complete voice.</li>
 </ul>
 <p>The example modules in <code>examples/rack-plugin</code> use the same pattern at a larger scale, combining several components each.</p>
 

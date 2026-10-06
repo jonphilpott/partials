@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Oscillators · mutablelib</title>
+<title>Oscillators · partials</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="page">
 <nav>
-  <div class="title">mutablelib</div>
+  <div class="title">partials</div>
   <a href="index.html">Overview</a>
   <a href="setup.html">Getting started</a>
   <a href="tutorial.html">Tutorial</a>
@@ -33,14 +33,14 @@
 <pre><code>void onSampleRateChange(const SampleRateChangeEvent&amp; e) override { osc.init(e.sampleRate); }
 
 void process(const ProcessArgs&amp; args) override {
-    float hz = ml::voltToHz(params[PITCH].getValue() + inputs[VOCT].getVoltage());
+    float hz = pt::voltToHz(params[PITCH].getValue() + inputs[VOCT].getVoltage());
     osc.setFrequency(hz);   // or setCarrierFrequency for the formant family
     outputs[OUT].setVoltage(5.f * osc.process());
 }</code></pre>
 
 <!-- ===================================================================== -->
 <h2 id="osc-variable_shape">VariableShapeOscillator</h2>
-<p class="origin"><code>#include "ml/osc/variable_shape.h"</code> · from Plaits</p>
+<p class="origin"><code>#include "pt/osc/variable_shape.h"</code> · from Plaits</p>
 <p>One oscillator that morphs smoothly from triangle to saw to square, with variable pulse width and optional hard sync. Plaits' virtual-analog workhorse.</p>
 <p><strong>How it works.</strong> The waveform is a blend of saw, square and triangle computed from one phase. Each shape's jumps and corners get a PolyBLEP correction weighted by its share of the blend, so every in-between shape is alias-free. With sync, a master phase restarts the oscillator each cycle, and the jump at the restart is corrected too.</p>
 <table>
@@ -51,7 +51,7 @@ void process(const ProcessArgs&amp; args) override {
 <tr><td><code>setPulseWidth(x)</code></td><td>0..1: the square's width and the triangle's peak position.</td></tr>
 </table>
 <pre><code>// A sync lead: the master follows V/Oct, the SYNC knob sweeps the slave up
-float hz = ml::voltToHz(inputs[VOCT].getVoltage());
+float hz = pt::voltToHz(inputs[VOCT].getVoltage());
 vs.setSyncFrequency(hz);
 vs.setFrequency(hz * std::pow(2.f, 3.f * params[SYNC].getValue()));   // up to 3 octaves
 vs.setShape(params[SHAPE].getValue());
@@ -60,7 +60,7 @@ outputs[OUT].setVoltage(5.f * vs.process());</code></pre>
 
 <!-- ===================================================================== -->
 <h2 id="osc-formant">FormantOscillator</h2>
-<p class="origin"><code>#include "ml/osc/formant.h"</code> · from Plaits</p>
+<p class="origin"><code>#include "pt/osc/formant.h"</code> · from Plaits</p>
 <p>A sine at the "formant" frequency, restarted at the pitch ("carrier") frequency. You hear the carrier's pitch with a spectral peak at the formant: a vocal or nasal tone, and sweeping the formant sounds like a filter sweep with no filter.</p>
 <table>
 <tr><th>Call</th><th>Effect</th></tr>
@@ -68,7 +68,7 @@ outputs[OUT].setVoltage(5.f * vs.process());</code></pre>
 <tr><td><code>setFormantFrequency(hz)</code></td><td>Spectral peak; usually above the pitch.</td></tr>
 <tr><td><code>setPhaseShift(x)</code></td><td>Phase offset of the formant sine (cycles), changing the waveform at each restart.</td></tr>
 </table>
-<pre><code>float hz = ml::voltToHz(inputs[VOCT].getVoltage());
+<pre><code>float hz = pt::voltToHz(inputs[VOCT].getVoltage());
 formant.setCarrierFrequency(hz);
 // The FORMANT knob covers 4 octaves above the pitch, so it tracks the note
 formant.setFormantFrequency(hz * std::pow(2.f, 4.f * params[FORMANT].getValue()));
@@ -76,7 +76,7 @@ outputs[OUT].setVoltage(5.f * formant.process());</code></pre>
 
 <!-- ===================================================================== -->
 <h2 id="osc-z_osc">ZOscillator</h2>
-<p class="origin"><code>#include "ml/osc/z_osc.h"</code> · from Plaits</p>
+<p class="origin"><code>#include "pt/osc/z_osc.h"</code> · from Plaits</p>
 <p>A resonant, filter-sweep-like tone in the style of the Casio CZ synths' resonance waveforms. A formant sine restarts twice per cycle and is faded by a window, so it sounds like a resonant filter being struck once per cycle. Sweeping the formant sweeps the "cutoff".</p>
 <table>
 <tr><th>Call</th><th>Effect</th></tr>
@@ -85,7 +85,7 @@ outputs[OUT].setVoltage(5.f * formant.process());</code></pre>
 <tr><td><code>setShape(x)</code></td><td>0..1: below 0.5 narrows the window, above shifts its phase.</td></tr>
 <tr><td><code>setMode(x)</code></td><td>0..1 in three bands: three CZ-like window and offset styles.</td></tr>
 </table>
-<pre><code>float hz = ml::voltToHz(inputs[VOCT].getVoltage());
+<pre><code>float hz = pt::voltToHz(inputs[VOCT].getVoltage());
 z.setCarrierFrequency(hz);
 z.setFormantFrequency(hz * (1.f + 15.f * params[RESONANCE].getValue()));
 z.setShape(params[SHAPE].getValue());
@@ -94,7 +94,7 @@ outputs[OUT].setVoltage(5.f * z.process());</code></pre>
 
 <!-- ===================================================================== -->
 <h2 id="osc-vosim">VosimOscillator</h2>
-<p class="origin"><code>#include "ml/osc/vosim.h"</code> · from Plaits</p>
+<p class="origin"><code>#include "pt/osc/vosim.h"</code> · from Plaits</p>
 <p>VOSIM ("VOice SIMulation"), a 1970s technique for vowel-like sounds. Two formant sines restart every pitch cycle and fade under a cosine window. The pitch comes from the restart rate and the vowel colour from the two formants, much as a voice has two main resonances.</p>
 <table>
 <tr><th>Call</th><th>Effect</th></tr>
@@ -104,15 +104,15 @@ outputs[OUT].setVoltage(5.f * z.process());</code></pre>
 </table>
 <pre><code>// Vowel morph: interpolate formant pairs from "oo" (300, 870) to "ah" (730, 1090) to "ee" (270, 2290)
 float v = params[VOWEL].getValue() * 2.f;
-float f1 = v &lt; 1.f ? ml::crossfade(300.f, 730.f, v) : ml::crossfade(730.f, 270.f, v - 1.f);
-float f2 = v &lt; 1.f ? ml::crossfade(870.f, 1090.f, v) : ml::crossfade(1090.f, 2290.f, v - 1.f);
-vosim.setCarrierFrequency(ml::voltToHz(inputs[VOCT].getVoltage()));
+float f1 = v &lt; 1.f ? pt::crossfade(300.f, 730.f, v) : pt::crossfade(730.f, 270.f, v - 1.f);
+float f2 = v &lt; 1.f ? pt::crossfade(870.f, 1090.f, v) : pt::crossfade(1090.f, 2290.f, v - 1.f);
+vosim.setCarrierFrequency(pt::voltToHz(inputs[VOCT].getVoltage()));
 vosim.setFormantFrequencies(f1, f2);
 outputs[OUT].setVoltage(5.f * vosim.process());</code></pre>
 
 <!-- ===================================================================== -->
 <h2 id="osc-grainlet">GrainletOscillator</h2>
-<p class="origin"><code>#include "ml/osc/grainlet.h"</code> · from Plaits</p>
+<p class="origin"><code>#include "pt/osc/grainlet.h"</code> · from Plaits</p>
 <p>A stream of tiny grains, one per pitch cycle: a formant sine shaped by a window that morphs from a short blip to a long bell. Sounds range from glassy and percussive to round and vocal. <code>bleed</code> lets the window itself through, adding body.</p>
 <table>
 <tr><th>Call</th><th>Effect</th></tr>
@@ -121,7 +121,7 @@ outputs[OUT].setVoltage(5.f * vosim.process());</code></pre>
 <tr><td><code>setShape(x)</code></td><td>0..1: short blip, then a skewed bell, then a long smooth bell.</td></tr>
 <tr><td><code>setBleed(x)</code></td><td>0..1 and above: how much of the window is heard.</td></tr>
 </table>
-<pre><code>float hz = ml::voltToHz(inputs[VOCT].getVoltage());
+<pre><code>float hz = pt::voltToHz(inputs[VOCT].getVoltage());
 grainlet.setCarrierFrequency(hz);
 grainlet.setFormantFrequency(hz * std::pow(2.f, 5.f * params[GRAIN].getValue()));
 grainlet.setShape(params[SHAPE].getValue());
@@ -130,7 +130,7 @@ outputs[OUT].setVoltage(5.f * grainlet.process());</code></pre>
 
 <!-- ===================================================================== -->
 <h2 id="osc-harmonic">HarmonicOscillator</h2>
-<p class="origin"><code>#include "ml/osc/harmonic.h"</code> · from Plaits (additive engine)</p>
+<p class="origin"><code>#include "pt/osc/harmonic.h"</code> · from Plaits (additive engine)</p>
 <p>Additive synthesis: up to 32 harmonics of one pitch, each with its own amplitude. Drive the amplitudes from knobs, CVs or computed spectra such as drawbars, formant peaks or spectral tilts.</p>
 <p><strong>How it works.</strong> It computes one sine per sample and derives every harmonic from it with the Chebyshev recurrence, at one multiply and one add per harmonic. Harmonics fade as they near Nyquist and are silent above it, so nothing aliases. The harmonics come out with phase offsets, which changes the waveform's shape but not its sound.</p>
 <table>
@@ -152,12 +152,12 @@ for (int k = 1; k &lt;= 16; ++k) {
 }
 for (float&amp; a : amps) a /= sum;               // normalise the level
 additive.setAmplitudes(amps, 16);
-additive.setFrequency(ml::voltToHz(inputs[VOCT].getVoltage()));
+additive.setFrequency(pt::voltToHz(inputs[VOCT].getVoltage()));
 outputs[OUT].setVoltage(5.f * additive.process());</code></pre>
 
 <!-- ===================================================================== -->
 <h2 id="osc-string_synth">StringSynthOscillator</h2>
-<p class="origin"><code>#include "ml/osc/string_synth.h"</code> · from Plaits (string machine and chord engines)</p>
+<p class="origin"><code>#include "pt/osc/string_synth.h"</code> · from Plaits (string machine and chord engines)</p>
 <p>A "divide-down" oscillator, as in string machines and combo organs. One master phase gives saw and square waves at four octaves at once, mixed by a registration, like an organ's stops. Follow it with an <a href="fx.html#fx-ensemble">Ensemble</a> for the classic string-machine sound. All octaves come from one counter, so they stay perfectly locked; very high notes drop their top registers rather than alias.</p>
 <table>
 <tr><th>Call</th><th>Effect</th></tr>
@@ -167,18 +167,18 @@ outputs[OUT].setVoltage(5.f * additive.process());</code></pre>
 <tr><td><code>setGain(g)</code></td><td>Output level.</td></tr>
 </table>
 <pre><code>// A string machine: divide-down oscillator, low-pass, ensemble
-strings.setFrequency(ml::voltToHz(inputs[VOCT].getVoltage()));
+strings.setFrequency(pt::voltToHz(inputs[VOCT].getVoltage()));
 strings.setRegistration(params[REGISTRATION].getValue());
-filter.setFrequency(3000.f, 0.7f);                 // ml::Svf
+filter.setFrequency(3000.f, 0.7f);                 // pt::Svf
 float s = filter.process(strings.process()).lp;
 float l = s, r = s;
-ensemble.process(l, r);                            // ml::Ensemble, amount 1
+ensemble.process(l, r);                            // pt::Ensemble, amount 1
 outputs[OUT_L].setVoltage(5.f * l);
 outputs[OUT_R].setVoltage(5.f * r);</code></pre>
 
 <!-- ===================================================================== -->
 <h2 id="osc-wavetable">WavetableOscillator</h2>
-<p class="origin"><code>#include "ml/osc/wavetable.h"</code> · from Plaits (wavetable engine)</p>
+<p class="origin"><code>#include "pt/osc/wavetable.h"</code> · from Plaits (wavetable engine)</p>
 <p>Plays your own single-cycle waveforms, morphing between them, with Plaits' cheap anti-aliasing.</p>
 <p><strong>How it works.</strong> <code>loadWaves()</code> stores each wave's running sum (its integral) rather than the wave. At play time, the difference between successive reads of the integral gives back the wave averaged over everything the read head skipped since the last sample. That averaging acts as a filter whose width follows the pitch, removing most of the aliasing plain table reads produce. A gentle pitch-tracking low-pass finishes the job.</p>
 <table>
@@ -188,7 +188,7 @@ outputs[OUT_R].setVoltage(5.f * r);</code></pre>
 <tr><td><code>setMorph(x)</code></td><td>0..1: position across the waves, blending neighbours.</td></tr>
 </table>
 <pre><code>// Build a table of 8 waves at start-up: sine morphing to saw-like
-ml::WavetableOscillator wt;
+pt::WavetableOscillator wt;
 MyModule() {
     const int n = 256, waves = 8;
     std::vector&lt;float&gt; table(n * waves);
@@ -205,8 +205,8 @@ MyModule() {
 void onSampleRateChange(const SampleRateChangeEvent&amp; e) override { wt.init(e.sampleRate); }
 
 void process(const ProcessArgs&amp; args) override {
-    wt.setFrequency(ml::voltToHz(inputs[VOCT].getVoltage()));
-    wt.setMorph(ml::clamp(params[MORPH].getValue() + inputs[MORPH_CV].getVoltage() / 10.f, 0.f, 1.f));
+    wt.setFrequency(pt::voltToHz(inputs[VOCT].getVoltage()));
+    wt.setMorph(pt::clamp(params[MORPH].getValue() + inputs[MORPH_CV].getVoltage() / 10.f, 0.f, 1.f));
     outputs[OUT].setVoltage(5.f * wt.process());
 }</code></pre>
 

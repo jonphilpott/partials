@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>mutablelib</title>
+<title>partials</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="page">
 <nav>
-  <div class="title">mutablelib</div>
+  <div class="title">partials</div>
   <a href="index.html" class="here">Overview</a>
   <a href="setup.html">Getting started</a>
   <a href="tutorial.html">Tutorial</a>
@@ -26,7 +26,7 @@
 </nav>
 <main>
 
-<h1>mutablelib</h1>
+<h1>partials</h1>
 <p class="lede">Emilie Gillet's Mutable Instruments DSP, taken apart into small building blocks for VCV Rack modules.</p>
 
 <p>Think of it as a lego set for new modules. Each component is one header containing one class: a resonator, a string, a reverb, a drum voice. It is not a way to rebuild Mutable modules: Rings, Clouds and Plaits already exist in Rack, and things Rack already does well, such as plain saw oscillators, are left out.</p>
@@ -34,32 +34,32 @@
 <h2>Using it in a Rack plugin</h2>
 <p>New to building Rack plugins? <a href="setup.html">Getting started</a> covers installing the tools and Rack SDK and building the example modules. Then the <a href="tutorial.html">tutorial</a> walks through building a module from scratch: a sawtooth oscillator into a low-pass filter.</p>
 <p>The library is header-only. Point your plugin's <code>Makefile</code> at it:</p>
-<pre><code>FLAGS += -I../mutablelib/include</code></pre>
+<pre><code>FLAGS += -I../partials/include</code></pre>
 <p>Then include what you need. Every component follows the same pattern:</p>
-<pre><code>#include "ml/filter/svf.h"
+<pre><code>#include "pt/filter/svf.h"
 
 struct MyModule : Module {
-    ml::Svf filter;                          // plain member, no allocation
+    pt::Svf filter;                          // plain member, no allocation
 
     void onSampleRateChange(const SampleRateChangeEvent&amp; e) override {
         filter.init(e.sampleRate);           // call before first process()
     }
 
     void process(const ProcessArgs&amp; args) override {
-        filter.setFrequency(ml::voltToHz(inputs[CUTOFF].getVoltage()), 0.707f);
+        filter.setFrequency(pt::voltToHz(inputs[CUTOFF].getVoltage()), 0.707f);
         float in = inputs[IN].getVoltage() / 5.f;   // Rack ±5 V → ±1
         outputs[OUT].setVoltage(5.f * filter.process(in).lp);
     }
 };</code></pre>
 <p><code>onSampleRateChange</code> also runs when the module is added, so <code>init()</code> there is enough.</p>
-<p>For quick experiments, <code>#include "ml/ml.h"</code> pulls in every component. In a finished module, include only what you use: compile times are shorter.</p>
+<p>For quick experiments, <code>#include "pt/partials.h"</code> pulls in every component. In a finished module, include only what you use: compile times are shorter.</p>
 <p>Six complete example modules are in <code>examples/rack-plugin</code>; see <a href="setup.html">Getting started</a> to build them.</p>
 
 <h2>Conventions</h2>
 <table>
 <tr><th>Thing</th><th>Convention</th></tr>
 <tr><td>Audio</td><td>±1.0. Multiply by 5 for Rack's ±5 V.</td></tr>
-<tr><td>Frequency</td><td>Hz. Convert Rack pitch voltage with <code>ml::voltToHz()</code>.</td></tr>
+<tr><td>Frequency</td><td>Hz. Convert Rack pitch voltage with <code>pt::voltToHz()</code>.</td></tr>
 <tr><td>Other parameters</td><td>0..1 unless the component says otherwise. Times are in seconds.</td></tr>
 <tr><td>Setup</td><td><code>init(sampleRate)</code> resets state and sizes buffers. Safe to call again whenever the rate changes.</td></tr>
 <tr><td>Processing</td><td><code>process()</code> returns one sample. Stereo components take <code>float&amp; left, float&amp; right</code>.</td></tr>

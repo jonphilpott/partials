@@ -1,8 +1,8 @@
 #include "plugin.hpp"
 
-#include "ml/core/units.h"
-#include "ml/filter/svf.h"
-#include "ml/osc/basic.h"
+#include "pt/core/units.h"
+#include "pt/filter/svf.h"
+#include "pt/osc/basic.h"
 
 
 struct SawFilter : Module {
@@ -22,21 +22,21 @@ struct SawFilter : Module {
 		LIGHTS_LEN
 	};
 
-	// The two mutablelib components: plain member variables.
-	ml::BasicOscillator oscillator;
-	ml::Svf filter;
+	// The two partials components: plain member variables.
+	pt::BasicOscillator oscillator;
+	pt::Svf filter;
 
 	SawFilter() {
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
 		// Frequency knob: -4..+4 octaves around C4. Rack shows it in Hz:
 		// 261.63 * 2^value, from 16 Hz to 4186 Hz.
-		configParam(FREQ_PARAM, -4.f, 4.f, 0.f, "Frequency", " Hz", 2.f, ml::kFreqC4);
+		configParam(FREQ_PARAM, -4.f, 4.f, 0.f, "Frequency", " Hz", 2.f, pt::kFreqC4);
 		// Cutoff knob: 0..1 mapped exponentially to 20 Hz..20 kHz. Rack
 		// shows it in Hz: 20 * 1000^value.
 		configParam(CUTOFF_PARAM, 0.f, 1.f, 0.5f, "Cutoff", " Hz", 1000.f, 20.f);
 		configOutput(OUT_OUTPUT, "Audio");
 
-		oscillator.setShape(ml::BasicOscillator::SAW);
+		oscillator.setShape(pt::BasicOscillator::SAW);
 	}
 
 	// Called when the module is added and whenever the sample rate
@@ -49,7 +49,7 @@ struct SawFilter : Module {
 	// Called once per sample.
 	void process(const ProcessArgs& args) override {
 		// 1. Read the knobs and convert them to Hz.
-		float frequency = ml::voltToHz(params[FREQ_PARAM].getValue());
+		float frequency = pt::voltToHz(params[FREQ_PARAM].getValue());
 		float cutoff = 20.f * std::pow(1000.f, params[CUTOFF_PARAM].getValue());
 
 		// 2. Oscillator: one sample of an alias-free sawtooth, about +-1.

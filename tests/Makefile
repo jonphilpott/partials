@@ -1,4 +1,4 @@
-# mutablelib tests. No framework: each test_*.cpp is its own program that
+# partials tests. No framework: each test_*.cpp is its own program that
 # returns non-zero on failure.
 #
 #   make check   build and run every test, then check the docs cover every header

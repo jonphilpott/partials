@@ -1,15 +1,15 @@
 {
-  "slug": "MutablelibDemo",
-  "name": "mutablelib demo",
+  "slug": "PartialsDemo",
+  "name": "partials demo",
   "version": "2.0.0",
   "license": "MIT",
-  "brand": "mutablelib",
+  "brand": "partials",
   "author": "Jon Philpott",
   "modules": [
     {
       "slug": "Strike",
       "name": "Strike",
-      "description": "Plucker into a modal resonator into a low-pass gate, built from mutablelib",
+      "description": "Plucker into a modal resonator into a low-pass gate, built from partials",
       "tags": [
         "Physical Modeling",
         "Voice"
@@ -18,7 +18,7 @@
     {
       "slug": "Haze",
       "name": "Haze",
-      "description": "Effects chain built from mutablelib: overdrive, ensemble, diffuser, reverb, limiter",
+      "description": "Effects chain built from partials: overdrive, ensemble, diffuser, reverb, limiter",
       "tags": [
         "Effect",
         "Reverb",
@@ -29,7 +29,7 @@
     {
       "slug": "Kit",
       "name": "Kit",
-      "description": "808-style kick, snare and hi-hat built from mutablelib's drums",
+      "description": "808-style kick, snare and hi-hat built from partials's drums",
       "tags": [
         "Drum"
       ]
@@ -37,7 +37,7 @@
     {
       "slug": "Drift",
       "name": "Drift",
-      "description": "Clocked random voltages with deja vu, glide and quantizing, built from mutablelib",
+      "description": "Clocked random voltages with deja vu, glide and quantizing, built from partials",
       "tags": [
         "Random",
         "Quantizer",
@@ -47,7 +47,7 @@
     {
       "slug": "Palette",
       "name": "Palette",
-      "description": "Six of Plaits' oscillators as one voice, built from mutablelib",
+      "description": "Six of Plaits' oscillators as one voice, built from partials",
       "tags": [
         "VCO"
       ]
@@ -55,7 +55,7 @@
     {
       "slug": "Bridge",
       "name": "Bridge",
-      "description": "Cross-modulation, frequency shifting and vocoding of two inputs, built from mutablelib",
+      "description": "Cross-modulation, frequency shifting and vocoding of two inputs, built from partials",
       "tags": [
         "Ring Modulator",
         "Frequency Shifter",

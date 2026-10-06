@@ -5,14 +5,14 @@
 #include <cstdio>
 #include <vector>
 
-#include "ml/analysis/onset_detector.h"
-#include "ml/core/random.h"
-#include "ml/filter/hilbert.h"
-#include "ml/filter/vowel.h"
-#include "ml/osc/basic.h"
-#include "ml/spectral/fm_operators.h"
-#include "ml/spectral/vocoder.h"
-#include "ml/spectral/xmod.h"
+#include "pt/analysis/onset_detector.h"
+#include "pt/core/random.h"
+#include "pt/filter/hilbert.h"
+#include "pt/filter/vowel.h"
+#include "pt/osc/basic.h"
+#include "pt/spectral/fm_operators.h"
+#include "pt/spectral/vocoder.h"
+#include "pt/spectral/xmod.h"
 
 #include "test.h"
 #include "wav.h"
@@ -40,20 +40,20 @@ static float level(const std::vector<float>& x, float sr, float hz) {
 }
 
 static void testXmod() {
-  CHECK_NEAR(ml::Xmod::xfade(1.0f, 0.0f, 0.0f), 0.0f, 1e-6f);      // all carrier
-  CHECK_NEAR(ml::Xmod::xfade(0.0f, 1.0f, 0.0f), 0.7071f, 1e-3f);
-  CHECK_NEAR(ml::Xmod::xfade(1.0f, 0.0f, 1.0f), 0.7071f, 1e-3f);   // all modulator
-  CHECK(ml::Xmod::digitalRing(0.5f, 0.0f, 0.5f) == 0.0f);
-  CHECK(ml::Xmod::digitalRing(0.5f, 0.5f, 0.0f) > 0.0f && ml::Xmod::digitalRing(0.5f, -0.5f, 0.0f) < 0.0f);
-  CHECK_NEAR(ml::Xmod::bitwiseXor(0.2f, 0.3f, 0.0f), 0.35f, 1e-6f);  // param 0: plain sum
-  CHECK_NEAR(ml::Xmod::comparator(0.2f, -0.4f, 0.0f), -0.4f, 1e-6f); // param 0: minimum
-  CHECK_NEAR(ml::Xmod::morph(1.0f, 0.3f, 0.6f, 0.5f), ml::Xmod::comparator(0.3f, 0.6f, 0.5f) * 0.001f + 0.3f * 0.999f, 1e-3f);
+  CHECK_NEAR(pt::Xmod::xfade(1.0f, 0.0f, 0.0f), 0.0f, 1e-6f);      // all carrier
+  CHECK_NEAR(pt::Xmod::xfade(0.0f, 1.0f, 0.0f), 0.7071f, 1e-3f);
+  CHECK_NEAR(pt::Xmod::xfade(1.0f, 0.0f, 1.0f), 0.7071f, 1e-3f);   // all modulator
+  CHECK(pt::Xmod::digitalRing(0.5f, 0.0f, 0.5f) == 0.0f);
+  CHECK(pt::Xmod::digitalRing(0.5f, 0.5f, 0.0f) > 0.0f && pt::Xmod::digitalRing(0.5f, -0.5f, 0.0f) < 0.0f);
+  CHECK_NEAR(pt::Xmod::bitwiseXor(0.2f, 0.3f, 0.0f), 0.35f, 1e-6f);  // param 0: plain sum
+  CHECK_NEAR(pt::Xmod::comparator(0.2f, -0.4f, 0.0f), -0.4f, 1e-6f); // param 0: minimum
+  CHECK_NEAR(pt::Xmod::morph(1.0f, 0.3f, 0.6f, 0.5f), pt::Xmod::comparator(0.3f, 0.6f, 0.5f) * 0.001f + 0.3f * 0.999f, 1e-3f);
   // Every algorithm, random inputs: finite and in a sane range.
-  ml::Random rng;
-  for (int a = 0; a <= ml::Xmod::NOP; ++a) {
+  pt::Random rng;
+  for (int a = 0; a <= pt::Xmod::NOP; ++a) {
     float peak = 0.0f;
     for (int i = 0; i < 20000; ++i) {
-      float y = ml::Xmod::process(static_cast<ml::Xmod::Algorithm>(a), rng.bipolar(), rng.bipolar(), rng.uniform());
+      float y = pt::Xmod::process(static_cast<pt::Xmod::Algorithm>(a), rng.bipolar(), rng.bipolar(), rng.uniform());
       CHECK(std::isfinite(y));
       peak = std::fmax(peak, std::fabs(y));
     }
@@ -69,7 +69,7 @@ static void testHilbert() {
                             6.454684139e-01f, 4.118108699e-01f, 9.725667152e-02f, -2.775386379e-01f,
                             -7.176356738e-01f};
   float c[17];
-  ml::Hilbert::designPoles(96000.0f, c);
+  pt::Hilbert::designPoles(96000.0f, c);
   float worst = 0.0f;
   for (int i = 0; i < 17; ++i) worst = std::fmax(worst, std::fabs(c[i] - (-kWarps[i])));
   std::printf("  hilbert: design vs Warps' table, worst %.2e\n", worst);
@@ -78,7 +78,7 @@ static void testHilbert() {
   // I and Q: equal level and 90 degrees apart across the audio band.
   for (float sr : kRates) {
     for (float hz : {50.0f, 500.0f, 5000.0f, 15000.0f}) {
-      ml::Hilbert h;
+      pt::Hilbert h;
       h.init(sr);
       double ii = 0.0, qq = 0.0, iq = 0.0;
       int n = static_cast<int>(sr);
@@ -104,11 +104,11 @@ static void testVowel() {
   float f1Low[2], f1High[2];
   const float vowels[2] = {0.0f, 0.5f};
   for (int v = 0; v < 2; ++v) {
-    ml::BasicOscillator pulse;
+    pt::BasicOscillator pulse;
     pulse.init(48000.0f);
-    pulse.setShape(ml::BasicOscillator::IMPULSE_TRAIN);
+    pulse.setShape(pt::BasicOscillator::IMPULSE_TRAIN);
     pulse.setFrequency(100.0f);
-    ml::VowelFilter f;
+    pt::VowelFilter f;
     f.init(48000.0f);
     f.setVowel(vowels[v]);
     f.setVoice(0.0f);
@@ -127,10 +127,10 @@ static void testVocoder() {
   for (float sr : kRates) {
     // Modulator: a 1 kHz tone for the first half, then silence. Carrier: a
     // 110 Hz saw (harmonics every 110 Hz).
-    ml::BasicOscillator saw;
+    pt::BasicOscillator saw;
     saw.init(sr);
     saw.setFrequency(110.0f);
-    ml::Vocoder v;
+    pt::Vocoder v;
     v.init(sr);
     v.setRelease(0.3f);
     std::vector<float> on(static_cast<size_t>(sr)), off(static_cast<size_t>(sr));
@@ -151,9 +151,9 @@ static void testVocoder() {
     if (sr == 48000.0f) writeWav("build/vocoder.wav", on, 48000);
   }
   // Formant shift extremes stay bounded.
-  ml::Vocoder v;
+  pt::Vocoder v;
   v.init(48000.0f);
-  ml::Random rng;
+  pt::Random rng;
   for (float shift : {0.0f, 1.0f}) {
     v.setFormantShift(shift);
     float peak = 0.0f;
@@ -165,7 +165,7 @@ static void testVocoder() {
 static void testFm() {
   for (float sr : kRates) {
     // DX7 algorithm 32: six carriers. Only operator 1 sounding: a pure sine.
-    ml::FmOperators fm;
+    pt::FmOperators fm;
     fm.init(sr, 6);
     fm.setAlgorithm(32);
     fm.setFrequency(220.0f);
@@ -191,7 +191,7 @@ static void testFm() {
   // Every algorithm, every operator at moderate level, feedback on: bounded.
   for (int ops : {4, 6}) {
     for (int a = 1; a <= (ops == 4 ? 8 : 32); ++a) {
-      ml::FmOperators fm;
+      pt::FmOperators fm;
       fm.init(48000.0f, ops);
       fm.setAlgorithm(a);
       fm.setFrequency(330.0f);
@@ -210,7 +210,7 @@ static void testFm() {
 static void testOnsets() {
   for (float sr : kRates) {
     // Five decaying 300 Hz notes, half a second apart.
-    ml::OnsetDetector d;
+    pt::OnsetDetector d;
     d.init(sr);  // default: 50 ms between onsets
     std::vector<float> times;
     int n = static_cast<int>(sr * 2.6f);

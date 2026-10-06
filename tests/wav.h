@@ -1,4 +1,4 @@
-// mutablelib — tests/wav.h
+// partials — tests/wav.h
 //
 // Minimal mono 32-bit float WAV writer for tests and examples. Not part of
 // the library.
@@ -8,8 +8,8 @@
 // (the byte order WAV requires and every desktop CPU uses), so there is no
 // struct-packing guesswork.
 
-#ifndef ML_TESTS_WAV_H_
-#define ML_TESTS_WAV_H_
+#ifndef PT_TESTS_WAV_H_
+#define PT_TESTS_WAV_H_
 
 #include <cstdint>
 #include <cstdio>
@@ -39,4 +39,4 @@ inline bool writeWav(const char* path, const std::vector<float>& samples,
   return true;
 }
 
-#endif  // ML_TESTS_WAV_H_
+#endif  // PT_TESTS_WAV_H_

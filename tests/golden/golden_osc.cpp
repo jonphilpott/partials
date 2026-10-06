@@ -16,16 +16,16 @@
 #include "plaits/dsp/oscillator/z_oscillator.h"
 #include "stmlib/utils/random.h"
 
-#include "ml/noise/clocked_noise.h"
-#include "ml/noise/dust.h"
-#include "ml/noise/smooth_random.h"
-#include "ml/osc/formant.h"
-#include "ml/osc/grainlet.h"
-#include "ml/osc/harmonic.h"
-#include "ml/osc/string_synth.h"
-#include "ml/osc/variable_shape.h"
-#include "ml/osc/vosim.h"
-#include "ml/osc/z_osc.h"
+#include "pt/noise/clocked_noise.h"
+#include "pt/noise/dust.h"
+#include "pt/noise/smooth_random.h"
+#include "pt/osc/formant.h"
+#include "pt/osc/grainlet.h"
+#include "pt/osc/harmonic.h"
+#include "pt/osc/string_synth.h"
+#include "pt/osc/variable_shape.h"
+#include "pt/osc/vosim.h"
+#include "pt/osc/z_osc.h"
 
 #include <cstdlib>
 
@@ -55,7 +55,7 @@ void osc() {
   for (float shape : {0.1f, 0.5f, 0.8f}) {
     static plaits::VariableShapeOscillator o;
     o.Init();
-    ml::VariableShapeOscillator p;
+    pt::VariableShapeOscillator p;
     p.init(kSr);
     p.setFrequency(220.0f);
     p.setPulseWidth(0.3f);
@@ -68,7 +68,7 @@ void osc() {
   {
     static plaits::VariableShapeOscillator o;
     o.Init();
-    ml::VariableShapeOscillator p;
+    pt::VariableShapeOscillator p;
     p.init(kSr);
     p.setSyncFrequency(110.0f);
     p.setFrequency(317.0f);
@@ -80,7 +80,7 @@ void osc() {
   {
     static plaits::FormantOscillator o;
     o.Init();
-    ml::FormantOscillator p;
+    pt::FormantOscillator p;
     p.init(kSr);
     p.setCarrierFrequency(150.0f);
     p.setFormantFrequency(1100.0f);
@@ -91,7 +91,7 @@ void osc() {
   {
     static plaits::ZOscillator o;
     o.Init();
-    ml::ZOscillator p;
+    pt::ZOscillator p;
     p.init(kSr);
     p.setCarrierFrequency(150.0f);
     p.setFormantFrequency(900.0f);
@@ -103,7 +103,7 @@ void osc() {
   {
     static plaits::VOSIMOscillator o;
     o.Init();
-    ml::VosimOscillator p;
+    pt::VosimOscillator p;
     p.init(kSr);
     p.setCarrierFrequency(120.0f);
     p.setFormantFrequencies(700.0f, 1200.0f);
@@ -114,7 +114,7 @@ void osc() {
   {
     static plaits::GrainletOscillator o;
     o.Init();
-    ml::GrainletOscillator p;
+    pt::GrainletOscillator p;
     p.init(kSr);
     p.setCarrierFrequency(150.0f);
     p.setFormantFrequency(800.0f);
@@ -128,7 +128,7 @@ void osc() {
     o.Init();
     float amps[12];
     for (int i = 0; i < 12; ++i) amps[i] = 0.5f / (i + 1);
-    ml::HarmonicOscillator p;
+    pt::HarmonicOscillator p;
     p.init(kSr);
     p.setFrequency(200.0f);
     p.setAmplitudes(amps, 12);
@@ -141,7 +141,7 @@ void osc() {
     static plaits::StringSynthOscillator o;
     o.Init();
     const float reg[7] = {0.3f, 0.0f, 0.2f, 0.3f, 0.0f, 0.2f, 0.0f};
-    ml::StringSynthOscillator p;
+    pt::StringSynthOscillator p;
     p.init(kSr);
     p.setFrequency(110.0f);
     p.setRegistration(reg);
@@ -153,7 +153,7 @@ void osc() {
     stmlib::Random::Seed(0x21);
     static plaits::ClockedNoise o;
     o.Init();
-    ml::ClockedNoise p;
+    pt::ClockedNoise p;
     p.init(kSr);
     p.setFrequency(f * kSr * 3.0f);
     compare("clocked noise", [&] { float x; o.Render(false, 3.0f * f, &x, 1); return x; },
@@ -163,7 +163,7 @@ void osc() {
     stmlib::Random::Seed(0x21);
     static plaits::SmoothRandomGenerator o;
     o.Init();
-    ml::SmoothRandom p;
+    pt::SmoothRandom p;
     p.init(kSr);
     p.setFrequency(20.0f);
     compare("smooth random", [&] { return o.Render(20.0f / kSr); },
@@ -171,7 +171,7 @@ void osc() {
   }
   {
     stmlib::Random::Seed(0x21);
-    ml::Dust p;
+    pt::Dust p;
     p.init(kSr);
     p.setDensity(500.0f);
     compare("dust", [&] { return plaits::Dust(500.0f / kSr); },

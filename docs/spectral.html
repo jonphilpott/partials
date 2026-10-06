@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Spectral · mutablelib</title>
+<title>Spectral · partials</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="page">
 <nav>
-  <div class="title">mutablelib</div>
+  <div class="title">partials</div>
   <a href="index.html">Overview</a>
   <a href="setup.html">Getting started</a>
   <a href="tutorial.html">Tutorial</a>
@@ -31,7 +31,7 @@
 
 <!-- ===================================================================== -->
 <h2 id="spectral-xmod">Xmod</h2>
-<p class="origin"><code>#include "ml/spectral/xmod.h"</code> · from Warps</p>
+<p class="origin"><code>#include "pt/spectral/xmod.h"</code> · from Warps</p>
 <p>Warps' algorithms for combining two signals, a modulator and a carrier, into one. They are plain per-sample functions, so they cost almost nothing.</p>
 <table>
 <tr><th>Algorithm</th><th>What it does</th><th><code>parameter</code></th></tr>
@@ -48,14 +48,14 @@
 <pre><code>// A Warps-style cross-modulator: one knob through all the algorithms
 float mod = inputs[MODULATOR].getVoltage() / 5.f;
 float car = inputs[CARRIER].getVoltage() / 5.f;
-float out = ml::Xmod::morph(params[ALGORITHM].getValue(), mod, car, params[TIMBRE].getValue());
+float out = pt::Xmod::morph(params[ALGORITHM].getValue(), mod, car, params[TIMBRE].getValue());
 outputs[OUT].setVoltage(5.f * out);</code></pre>
 <pre><code>// Or a plain ring modulator with a drive knob
-float ring = ml::Xmod::process(ml::Xmod::ANALOG_RING, mod, car, params[DRIVE].getValue());</code></pre>
+float ring = pt::Xmod::process(pt::Xmod::ANALOG_RING, mod, car, params[DRIVE].getValue());</code></pre>
 
 <!-- ===================================================================== -->
 <h2 id="filter-hilbert">Hilbert</h2>
-<p class="origin"><code>#include "ml/filter/hilbert.h"</code> · from Warps</p>
+<p class="origin"><code>#include "pt/filter/hilbert.h"</code> · from Warps</p>
 <p>Splits a signal into two copies 90° apart at every frequency from 10 Hz to 20 kHz, an in-phase signal I and a quadrature signal Q. This is the core of a frequency shifter, also called a Bode or single-sideband modulator: unlike a pitch shifter, it moves every partial by the same number of Hz, turning harmonic sounds inharmonic. <code>sqrt(I² + Q²)</code> also gives a smooth amplitude envelope.</p>
 <p><strong>How it works.</strong> Two chains of all-pass filters, which change phase but not level, are designed so their phases stay 90° apart (within about 1°). The design (an elliptic half-band filter split into all-passes, as in Warps) is computed for the actual sample rate; at 96 kHz it reproduces Warps' table exactly.</p>
 <table>
@@ -65,7 +65,7 @@ float ring = ml::Xmod::process(ml::Xmod::ANALOG_RING, mod, car, params[DRIVE].ge
 <tr><td><code>Hilbert::designPoles(sr, coefficients)</code></td><td>The design on its own (17 coefficients).</td></tr>
 </table>
 <pre><code>// Frequency shifter: shift every partial up (or down) by `shift` Hz
-ml::Hilbert hilbert;
+pt::Hilbert hilbert;
 float phase = 0.f;   // members; onSampleRateChange: hilbert.init(e.sampleRate);
 
 float shift = 500.f * (2.f * params[SHIFT].getValue() - 1.f);   // -500..+500 Hz
@@ -79,7 +79,7 @@ outputs[DOWN].setVoltage(5.f * (i * c + q * s));   // shifted down</code></pre>
 
 <!-- ===================================================================== -->
 <h2 id="filter-vowel">VowelFilter</h2>
-<p class="origin"><code>#include "ml/filter/vowel.h"</code> · from Plaits (simple speech synthesiser)</p>
+<p class="origin"><code>#include "pt/filter/vowel.h"</code> · from Plaits (simple speech synthesiser)</p>
 <p>A "talking" filter: five resonant band-passes tuned to the formants of a human voice, morphing across five vowels and five voice types. Put any bright source through it (a pulse train, a saw, noise) and it speaks.</p>
 <p><strong>How it works.</strong> A vowel is mostly defined by where the mouth and throat resonate, at a handful of frequencies called formants. A table holds the five formants (frequency and level) for each vowel and voice type; the controls blend between entries and retune the filters.</p>
 <table>
@@ -90,19 +90,19 @@ outputs[DOWN].setVoltage(5.f * (i * c + q * s));   // shifted down</code></pre>
 <tr><td><code>process(in)</code></td><td>The input through the formants. The resonances are strong; feed about ±0.2.</td></tr>
 </table>
 <pre><code>// A singing pulse: Plaits drives this filter with a band-limited pulse train
-ml::BasicOscillator pulse;
-ml::VowelFilter vowel;
-MyModule() { pulse.setShape(ml::BasicOscillator::IMPULSE_TRAIN); }
+pt::BasicOscillator pulse;
+pt::VowelFilter vowel;
+MyModule() { pulse.setShape(pt::BasicOscillator::IMPULSE_TRAIN); }
 // onSampleRateChange: pulse.init(sr); vowel.init(sr);
 
-pulse.setFrequency(ml::voltToHz(inputs[VOCT].getVoltage()));
-vowel.setVowel(ml::clamp(params[VOWEL].getValue() + inputs[VOWEL_CV].getVoltage() / 10.f, 0.f, 1.f));
+pulse.setFrequency(pt::voltToHz(inputs[VOCT].getVoltage()));
+vowel.setVowel(pt::clamp(params[VOWEL].getValue() + inputs[VOWEL_CV].getVoltage() / 10.f, 0.f, 1.f));
 vowel.setVoice(params[VOICE].getValue());
 outputs[OUT].setVoltage(5.f * vowel.process(0.2f * pulse.process()));</code></pre>
 
 <!-- ===================================================================== -->
 <h2 id="spectral-vocoder">Vocoder</h2>
-<p class="origin"><code>#include "ml/spectral/vocoder.h"</code> · from Warps</p>
+<p class="origin"><code>#include "pt/spectral/vocoder.h"</code> · from Warps</p>
 <p>Imposes the spectral envelope of one sound (the modulator, usually a voice) on another (the carrier, usually a rich synth tone): the classic talking synth.</p>
 <p><strong>How it works.</strong></p>
 <ol>
@@ -119,7 +119,7 @@ outputs[OUT].setVoltage(5.f * vowel.process(0.2f * pulse.process()));</code></pr
 <tr><td><code>setFormantShift(x)</code></td><td>0..1. 0.5 is normal vocoding; lower or higher shifts the formants down or up (about ±2 octaves at the extremes).</td></tr>
 <tr><td><code>process(modulator, carrier)</code></td><td>Returns the vocoded signal.</td></tr>
 </table>
-<pre><code>ml::Vocoder vocoder;   // onSampleRateChange: vocoder.init(e.sampleRate);
+<pre><code>pt::Vocoder vocoder;   // onSampleRateChange: vocoder.init(e.sampleRate);
 
 vocoder.setRelease(params[RELEASE].getValue());
 vocoder.setFormantShift(params[SHIFT].getValue());
@@ -129,7 +129,7 @@ outputs[OUT].setVoltage(5.f * vocoder.process(voice, synth));</code></pre>
 
 <!-- ===================================================================== -->
 <h2 id="spectral-fm_operators">FmOperators</h2>
-<p class="origin"><code>#include "ml/spectral/fm_operators.h"</code> · from Plaits (FM engine)</p>
+<p class="origin"><code>#include "pt/spectral/fm_operators.h"</code> · from Plaits (FM engine)</p>
 <p>A 4- or 6-operator FM voice in the style of Yamaha's DX synths, with all 8 four-operator (DX100) or 32 six-operator (DX7) algorithms. There are no patches or envelopes: you set each operator's frequency ratio and level, drive the levels from your own envelopes, and choose an algorithm.</p>
 <p><strong>How it works.</strong> Each operator is a sine whose phase can be pushed by other operators' outputs ("FM", strictly phase modulation). A modulator's level sets the modulation index, which controls how many harmonics appear. The algorithm decides which operators modulate which and which are heard. One operator per algorithm can feed back into itself or its chain, from smooth to noisy. Operators are numbered as on the DX synths: operator 1 is usually a carrier.</p>
 <table>
@@ -143,8 +143,8 @@ outputs[OUT].setVoltage(5.f * vocoder.process(voice, synth));</code></pre>
 <tr><td><code>reset()</code></td><td>Restart all phases; call on note-on for a consistent attack.</td></tr>
 </table>
 <pre><code>// An electric piano-ish 2-operator patch on DX7 algorithm 5, with envelopes
-ml::FmOperators fm;
-ml::Envelope carrierEnv, modulatorEnv;
+pt::FmOperators fm;
+pt::Envelope carrierEnv, modulatorEnv;
 dsp::SchmittTrigger gateTrig;
 // onSampleRateChange: fm.init(sr, 6); carrierEnv.init(sr); modulatorEnv.init(sr);
 //   fm.setAlgorithm(5); fm.setRatio(1, 1.f); fm.setRatio(2, 14.f);
@@ -152,14 +152,14 @@ dsp::SchmittTrigger gateTrig;
 
 bool gate = inputs[GATE].getVoltage() &gt;= 1.f;
 if (gateTrig.process(inputs[GATE].getVoltage(), 0.1f, 1.f)) fm.reset();
-fm.setFrequency(ml::voltToHz(inputs[VOCT].getVoltage()));
+fm.setFrequency(pt::voltToHz(inputs[VOCT].getVoltage()));
 fm.setLevel(1, 0.8f * carrierEnv.process(gate));                       // carrier
 fm.setLevel(2, params[TINE].getValue() * 2.f * modulatorEnv.process(gate));   // the "tine"
 outputs[OUT].setVoltage(5.f * fm.process());</code></pre>
 
 <!-- ===================================================================== -->
 <h2 id="analysis-onset_detector">OnsetDetector</h2>
-<p class="origin"><code>#include "ml/analysis/onset_detector.h"</code> · from Rings</p>
+<p class="origin"><code>#include "pt/analysis/onset_detector.h"</code> · from Rings</p>
 <p>Detects when a new note or hit starts in audio. Rings uses it to strum its internal exciter from the audio input; use it to trigger envelopes, drums or sequencers from a guitar, a drum loop or a voice.</p>
 <p><strong>How it works.</strong></p>
 <ol>
@@ -174,7 +174,7 @@ outputs[OUT].setVoltage(5.f * fm.process());</code></pre>
 <tr><td><code>process(in)</code></td><td>Returns true on the sample an onset is detected; <code>onset()</code> repeats it.</td></tr>
 </table>
 <pre><code>// Audio to trigger: a 1 ms pulse on each detected onset
-ml::OnsetDetector onsets;      // onSampleRateChange: onsets.init(e.sampleRate);
+pt::OnsetDetector onsets;      // onSampleRateChange: onsets.init(e.sampleRate);
 dsp::PulseGenerator pulse;
 
 if (onsets.process(inputs[IN].getVoltage() / 5.f)) pulse.trigger(1e-3f);

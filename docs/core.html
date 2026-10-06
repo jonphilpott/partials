@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Core · mutablelib</title>
+<title>Core · partials</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="page">
 <nav>
-  <div class="title">mutablelib</div>
+  <div class="title">partials</div>
   <a href="index.html">Overview</a>
   <a href="setup.html">Getting started</a>
   <a href="tutorial.html">Tutorial</a>
@@ -28,18 +28,18 @@
 
 <h1>Core</h1>
 <p class="lede">Small helpers the components are built on, also useful directly in your own modules. They replace the parts of stmlib that Gillet's code relies on.</p>
-<p>Every function is a plain <code>inline</code> function in namespace <code>ml</code>. None allocates memory or keeps hidden state, so all are safe to call from <code>process()</code>.</p>
+<p>Every function is a plain <code>inline</code> function in namespace <code>pt</code>. None allocates memory or keeps hidden state, so all are safe to call from <code>process()</code>.</p>
 
 <!-- ===================================================================== -->
 <h2 id="core-math">math.h</h2>
 <p class="origin">from stmlib <code>dsp/dsp.h</code></p>
 <p>Clamping, table lookup, blending, saturation and smoothing.</p>
-<pre><code>#include "ml/core/math.h"</code></pre>
+<pre><code>#include "pt/core/math.h"</code></pre>
 
 <h3 id="core-math-clamp">clamp(x, lo, hi)</h3>
 <p>Returns <code>x</code> kept within <code>[lo, hi]</code>. Rack plugins build as C++11, which has no <code>std::clamp</code>.</p>
 <pre><code>// Knob plus CV, kept in the 0..1 range a component expects
-float structure = ml::clamp(params[STRUCTURE].getValue()
+float structure = pt::clamp(params[STRUCTURE].getValue()
                             + inputs[STRUCTURE_CV].getVoltage() / 10.f, 0.f, 1.f);</code></pre>
 
 <h3 id="core-math-interpolate">interpolate(table, index, size)</h3>
@@ -51,43 +51,43 @@ float structure = ml::clamp(params[STRUCTURE].getValue()
 <p>Use it for curves that are too costly to compute per sample, or that you designed by hand.</p>
 <pre><code>// A hand-drawn response curve in 4 steps (5 points)
 static const float curve[5] = {0.f, 0.1f, 0.3f, 0.6f, 1.f};
-float shaped = ml::interpolate(curve, params[AMOUNT].getValue(), 4.f);
+float shaped = pt::interpolate(curve, params[AMOUNT].getValue(), 4.f);
 // AMOUNT = 0.375 sits halfway between curve[1] and curve[2]: returns 0.2</code></pre>
 
 <h3 id="core-math-interpolateWrap">interpolateWrap(table, index, size)</h3>
 <p>As <code>interpolate()</code>, but only the fractional part of <code>index</code> counts: 1.25 reads the same place as 0.25. Use it for periodic tables such as one cycle of a waveform, driven by a phase that may run past 1.</p>
 <pre><code>// A wavetable oscillator from a single-cycle table of 256 steps (257 entries)
 phase += hz * args.sampleTime;                 // no need to wrap the phase
-float out = ml::interpolateWrap(myWave, phase, 256.f);
+float out = pt::interpolateWrap(myWave, phase, 256.f);
 phase -= std::floor(phase);                    // keep it small for precision</code></pre>
 
 <h3 id="core-math-interpolateHermite">interpolateHermite(table, index, size)</h3>
 <p>Cubic interpolation through the four nearest points. It is smoother than linear and adds less high-frequency grit when a table is read slowly or sweeps. It needs one guard entry before the position and two after.</p>
 <pre><code>// Table with guard points: data[0] is a guard, data[1..N+1] the curve, data[N+2] a guard
-float y = ml::interpolateHermite(data + 1, x, float(N));</code></pre>
+float y = pt::interpolateHermite(data + 1, x, float(N));</code></pre>
 
 <h3 id="core-math-crossfade">crossfade(a, b, fade)</h3>
 <p>Linear blend: <code>fade</code> = 0 gives <code>a</code>, 1 gives <code>b</code>, 0.5 gives the average.</p>
 <pre><code>// Dry/wet mix knob
 float mix = params[MIX].getValue();
-float out = ml::crossfade(dry, wet, mix);</code></pre>
+float out = pt::crossfade(dry, wet, mix);</code></pre>
 
 <h3 id="core-math-smoothStep">smoothStep(x)</h3>
 <p>S-shaped curve on 0..1: slow at both ends, fastest in the middle. Good for crossfades and morphs that shouldn't jump at the edges.</p>
 <pre><code>// Equal-feeling morph between two oscillators
-float m = ml::smoothStep(params[MORPH].getValue());
-float out = ml::crossfade(oscA, oscB, m);</code></pre>
+float m = pt::smoothStep(params[MORPH].getValue());
+float out = pt::crossfade(oscA, oscB, m);</code></pre>
 
 <h3 id="core-math-softLimit">softLimit(x)</h3>
 <p>Cheap tanh-like saturation: almost linear for small signals, curving to exactly ±1 at x = ±3. Only valid between −3 and 3. Use <code>softClip()</code> if the input can go further.</p>
 <pre><code>// Gentle warmth on a signal that stays within ±3
-float y = ml::softLimit(1.5f * x);</code></pre>
+float y = pt::softLimit(1.5f * x);</code></pre>
 
 <h3 id="core-math-softClip">softClip(x)</h3>
 <p><code>softLimit()</code> made safe for any input: values beyond ±3 return ±1. A cheap overdrive, or a guard against a resonant patch blowing up.</p>
 <pre><code>// Drive knob from clean (1×) to heavily saturated (10×)
 float drive = 1.f + 9.f * params[DRIVE].getValue();
-outputs[OUT].setVoltage(5.f * ml::softClip(drive * in));</code></pre>
+outputs[OUT].setVoltage(5.f * pt::softClip(drive * in));</code></pre>
 
 <h3 id="core-math-onePole">onePole(state, target, coefficient)</h3>
 <p>Moves <code>state</code> a fraction <code>coefficient</code> (0..1) of the way to <code>target</code>. Called every sample, this is a one-pole low-pass: exponential smoothing with a time constant of about <code>1 / (coefficient · sampleRate)</code> seconds. Use it to smooth knobs and CVs and avoid zipper noise. For a filter set in Hz, use <a href="plumbing.html#filter-one_pole">OnePole</a>.</p>
@@ -95,7 +95,7 @@ outputs[OUT].setVoltage(5.f * ml::softClip(drive * in));</code></pre>
 
 // in process(): reach the knob value with a ~10 ms time constant
 float c = args.sampleTime / 0.010f;
-ml::onePole(cutoffSmoothed, params[CUTOFF].getValue(), c);</code></pre>
+pt::onePole(cutoffSmoothed, params[CUTOFF].getValue(), c);</code></pre>
 
 <h3 id="core-math-slope">slope(state, target, rise, fall)</h3>
 <p>As <code>onePole()</code>, with separate speeds for rising and falling. The classic use is an envelope follower: fast attack, slow release.</p>
@@ -103,7 +103,7 @@ ml::onePole(cutoffSmoothed, params[CUTOFF].getValue(), c);</code></pre>
 
 // Attack ~1 ms, release ~200 ms
 float rise = args.sampleTime / 0.001f, fall = args.sampleTime / 0.2f;
-ml::slope(envelope, std::fabs(in), rise, fall);
+pt::slope(envelope, std::fabs(in), rise, fall);
 outputs[ENV].setVoltage(10.f * envelope);</code></pre>
 
 <h3 id="core-math-slew">slew(state, target, maxDelta)</h3>
@@ -111,44 +111,44 @@ outputs[ENV].setVoltage(10.f * envelope);</code></pre>
 <pre><code>float pitch = 0.f;   // member, in volts
 
 // Glide at most 2 octaves per second
-ml::slew(pitch, inputs[VOCT].getVoltage(), 2.f * args.sampleTime);
-float hz = ml::voltToHz(pitch);</code></pre>
+pt::slew(pitch, inputs[VOCT].getVoltage(), 2.f * args.sampleTime);
+float hz = pt::voltToHz(pitch);</code></pre>
 
 <h3 id="core-math-rescaleCoefficient">rescaleCoefficient(c, ratio)</h3>
 <p>Converts a per-sample one-pole coefficient tuned at one sample rate to another, so the smoothing time in seconds stays the same. <code>ratio</code> is <code>originalRate / newRate</code>. Useful when porting code written for a fixed rate, as Gillet's was.</p>
 <p>How it works: after n samples a one-pole covers <code>1 − (1 − c)<sup>n</sup></code> of the distance to its target, so <code>(1 − c)</code> is raised to the power <code>ratio</code>.</p>
 <pre><code>// Code written for 32 kHz used c = 0.01 per sample.
 // The same smoothing time at the current rate:
-float c = ml::rescaleCoefficient(0.01f, 32000.f / args.sampleRate);
-ml::onePole(state, target, c);</code></pre>
+float c = pt::rescaleCoefficient(0.01f, 32000.f / args.sampleRate);
+pt::onePole(state, target, c);</code></pre>
 
 <!-- ===================================================================== -->
 <h2 id="core-units">units.h</h2>
 <p class="origin">from stmlib <code>dsp/units.h</code></p>
-<p>Conversions between pitch voltages, notes, intervals and Hz. The library works in Hz; these bridge to Rack's 1 V/octave standard, where 0 V is C4 = 261.6256 Hz (available as <code>ml::kFreqC4</code>).</p>
-<pre><code>#include "ml/core/units.h"</code></pre>
+<p>Conversions between pitch voltages, notes, intervals and Hz. The library works in Hz; these bridge to Rack's 1 V/octave standard, where 0 V is C4 = 261.6256 Hz (available as <code>pt::kFreqC4</code>).</p>
+<pre><code>#include "pt/core/units.h"</code></pre>
 
 <h3 id="core-units-voltToHz">voltToHz(volts)</h3>
 <p>Rack pitch voltage to Hz. Every volt doubles the frequency: 0 V = 261.63 Hz, 1 V = 523.25 Hz, −1 V = 130.81 Hz.</p>
 <pre><code>// Pitch knob (±4 octaves) plus V/Oct input
 float volts = params[PITCH].getValue() + inputs[VOCT].getVoltage();
-resonator.setFrequency(ml::voltToHz(volts));</code></pre>
+resonator.setFrequency(pt::voltToHz(volts));</code></pre>
 
 <h3 id="core-units-hzToVolt">hzToVolt(hz)</h3>
 <p>Hz to Rack pitch voltage, the inverse of <code>voltToHz()</code>. Use it to output a pitch CV you have computed in Hz, for example from a pitch tracker.</p>
 <pre><code>float detectedHz = 440.f;
-outputs[PITCH_OUT].setVoltage(ml::hzToVolt(detectedHz));   // 0.75 V</code></pre>
+outputs[PITCH_OUT].setVoltage(pt::hzToVolt(detectedHz));   // 0.75 V</code></pre>
 
 <h3 id="core-units-semitonesToRatio">semitonesToRatio(semitones)</h3>
 <p>Interval to frequency ratio: 12 semitones = 2.0, 7 (a fifth) ≈ 1.498, −12 = 0.5. Fractional semitones work, for detune in cents.</p>
 <pre><code>// Second voice a fifth up, with a fine-tune knob of ±50 cents
-float ratio = ml::semitonesToRatio(7.f + params[FINE].getValue() * 0.5f);
+float ratio = pt::semitonesToRatio(7.f + params[FINE].getValue() * 0.5f);
 voice2.setFrequency(hz * ratio);</code></pre>
 
 <h3 id="core-units-midiToHz">midiToHz(note)</h3>
 <p>MIDI note number to Hz: note 69 = A4 = 440 Hz, note 60 = middle C = 261.63 Hz.</p>
 <pre><code>// A fixed bass note, E1 (MIDI 28)
-string.setFrequency(ml::midiToHz(28.f));   // 41.2 Hz</code></pre>
+string.setFrequency(pt::midiToHz(28.f));   // 41.2 Hz</code></pre>
 
 <!-- ===================================================================== -->
 <h2 id="core-random">random.h · Random</h2>
@@ -161,9 +161,9 @@ string.setFrequency(ml::midiToHz(28.f));   // 41.2 Hz</code></pre>
 <tr><td><code>uniform()</code></td><td>Float in [0, 1).</td></tr>
 <tr><td><code>bipolar()</code></td><td>Float in [−1, 1): white noise.</td></tr>
 </table>
-<pre><code>#include "ml/core/random.h"
+<pre><code>#include "pt/core/random.h"
 
-ml::Random rng;   // member
+pt::Random rng;   // member
 
 // White noise output
 outputs[NOISE].setVoltage(5.f * rng.bipolar());
@@ -179,28 +179,28 @@ int step = rng.word() % 8;</code></pre>
 <h2 id="core-tables">tables.h</h2>
 <p class="origin">replaces the pre-computed tables in the firmware's <code>resources.cc</code></p>
 <p>The firmware ships these tables pre-computed. Here each is built the first time it is used, and is then shared by every module instance. Components build the tables they need in <code>init()</code>, so the audio thread never pays for it. If you use a table directly, call it once in your module's constructor for the same reason.</p>
-<pre><code>#include "ml/core/tables.h"</code></pre>
+<pre><code>#include "pt/core/tables.h"</code></pre>
 
 <h3 id="core-tables-sineTable">sineTable()</h3>
-<p>One sine cycle in <code>ml::kSineTableSize</code> (512) steps, plus a quarter cycle and a guard point. Cosine is the same table read a quarter cycle (128 entries) later. Read it with <code>interpolateWrap()</code> for a cheap sine oscillator or LFO.</p>
-<pre><code>MyModule() { ml::sineTable(); }   // build it outside the audio thread
+<p>One sine cycle in <code>pt::kSineTableSize</code> (512) steps, plus a quarter cycle and a guard point. Cosine is the same table read a quarter cycle (128 entries) later. Read it with <code>interpolateWrap()</code> for a cheap sine oscillator or LFO.</p>
+<pre><code>MyModule() { pt::sineTable(); }   // build it outside the audio thread
 
 // in process(): a sine LFO and its quadrature (90° later) partner
 lfoPhase += rate * args.sampleTime;
 lfoPhase -= std::floor(lfoPhase);
-float s = ml::interpolateWrap(ml::sineTable(), lfoPhase, ml::kSineTableSize);
-float c = ml::interpolateWrap(ml::sineTable(), lfoPhase + 0.25f, ml::kSineTableSize);</code></pre>
+float s = pt::interpolateWrap(pt::sineTable(), lfoPhase, pt::kSineTableSize);
+float c = pt::interpolateWrap(pt::sineTable(), lfoPhase + 0.25f, pt::kSineTableSize);</code></pre>
 
 <h3 id="core-tables-lut4Decades">lut4Decades()</h3>
 <p>The curve 10<sup>4x</sup> for x = 0..1: four decades (1 to 10,000) in 256 steps. It maps a knob onto a range wide enough for decay times or Q. The modal resonator uses it for damping.</p>
 <pre><code>// Map a knob to a time between 1 ms and 10 s
 float k = params[TIME].getValue();
-float seconds = 0.001f * ml::interpolate(ml::lut4Decades(), k, 256.f);</code></pre>
+float seconds = 0.001f * pt::interpolate(pt::lut4Decades(), k, 256.f);</code></pre>
 
 <h3 id="core-tables-lutStiffness">lutStiffness()</h3>
 <p>The modal resonator's structure curve: how much each partial is stretched away from a harmonic series, for structure 0..1. It is negative (bell-like) below 0.25, zero (a string) from 0.25 to 0.3, then rises steeply (bars, plates, metal). Useful for building your own additive or modal instrument with the same feel.</p>
 <pre><code>// Partial frequencies for an additive voice with Rings' inharmonicity
-float stiffness = ml::interpolate(ml::lutStiffness(), structure, 256.f);
+float stiffness = pt::interpolate(pt::lutStiffness(), structure, 256.f);
 float stretch = 1.f, partialHz = hz;
 for (int k = 0; k &lt; 16; ++k) {
     partials[k] = partialHz * stretch;
@@ -213,7 +213,7 @@ for (int k = 0; k &lt; 16; ++k) {
 <p>Phase delay, in periods, that an Svf low-pass adds to a note, indexed by the cutoff in semitones above the note (0..256, read with size 1). The String subtracts it from its delay line so its damping filter doesn't pull the note flat. Do the same in any tuned feedback loop with a low-pass inside.</p>
 <pre><code>// Feedback comb tuned to hz, with a low-pass 36 semitones above it in the loop
 float period = args.sampleRate / hz;
-float shift = ml::interpolate(ml::lutSvfShift(), 36.f, 1.f);   // in periods
+float shift = pt::interpolate(pt::lutSvfShift(), 36.f, 1.f);   // in periods
 float delay = period * (1.f - shift);</code></pre>
 
 </main>

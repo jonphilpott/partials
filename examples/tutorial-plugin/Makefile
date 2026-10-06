@@ -2,9 +2,9 @@
 RACK_DIR ?= ../../../Rack-SDK
 
 # FLAGS will be passed to both the C and C++ compiler
-# mutablelib is header-only: adding its include folder is all it needs.
-# (In your own plugin this is wherever you put mutablelib, e.g.
-# -Idep/mutablelib/include; see docs/tutorial.html.)
+# partials is header-only: adding its include folder is all it needs.
+# (In your own plugin this is wherever you put partials, e.g.
+# -Idep/partials/include; see docs/tutorial.html.)
 FLAGS += -I../../include
 CFLAGS +=
 CXXFLAGS +=

@@ -1,4 +1,4 @@
-// Drift: clocked random voltages, Marbles-style, built from mutablelib's
+// Drift: clocked random voltages, Marbles-style, built from partials's
 // modulation parts.
 //
 //   clock -> ClockToRamp -> new value each step from RandomSequence
@@ -12,22 +12,22 @@
 
 #include "plugin.hpp"
 
-#include "ml/mod/clock_to_ramp.h"
-#include "ml/mod/lag.h"
-#include "ml/mod/quantizer.h"
-#include "ml/mod/random_sequence.h"
-#include "ml/mod/slope.h"
+#include "pt/mod/clock_to_ramp.h"
+#include "pt/mod/lag.h"
+#include "pt/mod/quantizer.h"
+#include "pt/mod/random_sequence.h"
+#include "pt/mod/slope.h"
 
 struct Drift : Module {
   enum ParamId { DEJA_VU_PARAM, LENGTH_PARAM, STEPS_PARAM, QUANTIZE_PARAM, DECAY_PARAM, PARAMS_LEN };
   enum InputId { CLOCK_INPUT, INPUTS_LEN };
   enum OutputId { PITCH_OUTPUT, SMOOTH_OUTPUT, ENV_OUTPUT, OUTPUTS_LEN };
 
-  ml::ClockToRamp clock;
-  ml::RandomSequence sequence;
-  ml::Lag lag;
-  ml::Quantizer quantizer;
-  ml::Slope envelope;
+  pt::ClockToRamp clock;
+  pt::RandomSequence sequence;
+  pt::Lag lag;
+  pt::Quantizer quantizer;
+  pt::Slope envelope;
   float value = 0.5f;
   float previousRamp = 0.f;
 
@@ -45,13 +45,13 @@ struct Drift : Module {
     configOutput(ENV_OUTPUT, "Envelope per step (0-8 V)");
     sequence.init();
     lag.init();
-    quantizer.init(ml::Quantizer::preset(ml::Quantizer::MAJOR));
+    quantizer.init(pt::Quantizer::preset(pt::Quantizer::MAJOR));
   }
 
   void onSampleRateChange(const SampleRateChangeEvent& e) override {
     clock.init(e.sampleRate);
     envelope.init(e.sampleRate);
-    envelope.setMode(ml::Slope::AD);
+    envelope.setMode(pt::Slope::AD);
     envelope.setSlope(0.05f);  // fast attack
   }
 

@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Noise · mutablelib</title>
+<title>Noise · partials</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="page">
 <nav>
-  <div class="title">mutablelib</div>
+  <div class="title">partials</div>
   <a href="index.html">Overview</a>
   <a href="setup.html">Getting started</a>
   <a href="tutorial.html">Tutorial</a>
@@ -28,11 +28,11 @@
 
 <h1>Noise</h1>
 <p class="lede">Random sources from Plaits: crackle, stepped noise, smooth wander and resonant particles.</p>
-<p>For plain white noise, use <a href="core.html#core-random">ml::Random</a>: <code>rng.bipolar()</code>. Every source here has <code>seed(s)</code> for repeatable output.</p>
+<p>For plain white noise, use <a href="core.html#core-random">pt::Random</a>: <code>rng.bipolar()</code>. Every source here has <code>seed(s)</code> for repeatable output.</p>
 
 <!-- ===================================================================== -->
 <h2 id="noise-dust">Dust</h2>
-<p class="origin"><code>#include "ml/noise/dust.h"</code> · from Plaits</p>
+<p class="origin"><code>#include "pt/noise/dust.h"</code> · from Plaits</p>
 <p>Sparse random impulses with random heights, arriving at an average rate. Low densities give vinyl crackle or rain; high densities give hiss. It is also a good exciter for the <a href="physical.html">resonators</a>.</p>
 <p><strong>How it works.</strong> Each sample, a random number u (0..1) is drawn. If u is below the chance of an impulse in one sample (density ÷ sample rate), the output is an impulse of height u ÷ that chance; otherwise it is silent.</p>
 <table>
@@ -47,7 +47,7 @@ outputs[OUT].setVoltage(5.f * resonator.process(in));</code></pre>
 
 <!-- ===================================================================== -->
 <h2 id="noise-clocked_noise">ClockedNoise</h2>
-<p class="origin"><code>#include "ml/noise/clocked_noise.h"</code> · from Plaits</p>
+<p class="origin"><code>#include "pt/noise/clocked_noise.h"</code> · from Plaits</p>
 <p>Sample-and-hold noise: random values held for one clock period each. Low rates give stepped "computer" noise, middle rates a pitched, crunchy buzz, and high rates white noise.</p>
 <p><strong>How it works.</strong> A phase accumulator ticks at the rate, and each tick holds a new random value. Each step is placed at its exact position between samples and smoothed with PolyBLEP, so the result is pitched rather than aliased. Near and above a quarter of the sample rate it fades into white noise. Sync restarts the clock.</p>
 <table>
@@ -57,13 +57,13 @@ outputs[OUT].setVoltage(5.f * resonator.process(in));</code></pre>
 </table>
 <pre><code>// Pitched digital noise, sync-able from a trigger
 dsp::SchmittTrigger sync;
-noise.setFrequency(ml::voltToHz(inputs[VOCT].getVoltage() + 2.f));
+noise.setFrequency(pt::voltToHz(inputs[VOCT].getVoltage() + 2.f));
 bool s = sync.process(inputs[SYNC].getVoltage(), 0.1f, 1.f);
 outputs[OUT].setVoltage(5.f * noise.process(s));</code></pre>
 
 <!-- ===================================================================== -->
 <h2 id="noise-smooth_random">SmoothRandom</h2>
-<p class="origin"><code>#include "ml/noise/smooth_random.h"</code> · from Plaits</p>
+<p class="origin"><code>#include "pt/noise/smooth_random.h"</code> · from Plaits</p>
 <p>A smoothly wandering random signal: a random LFO. At each tick it picks a new random target (±1) and glides there along an S-curve, so there are no corners. Use it for vibrato that never repeats, drifting filters, or random panning.</p>
 <table>
 <tr><th>Call</th><th>Effect</th></tr>
@@ -73,11 +73,11 @@ outputs[OUT].setVoltage(5.f * noise.process(s));</code></pre>
 <pre><code>// Subtle analog-style pitch drift: ±10 cents, wandering at 0.5 Hz
 drift.setFrequency(0.5f);
 float cents = 10.f * drift.process();
-osc.setFrequency(hz * ml::semitonesToRatio(cents / 100.f));</code></pre>
+osc.setFrequency(hz * pt::semitonesToRatio(cents / 100.f));</code></pre>
 
 <!-- ===================================================================== -->
 <h2 id="noise-particle">Particle</h2>
-<p class="origin"><code>#include "ml/noise/particle.h"</code> · from Plaits</p>
+<p class="origin"><code>#include "pt/noise/particle.h"</code> · from Plaits</p>
 <p>Random impulses, each ringing a resonant filter tuned to a random pitch around a centre frequency. Low densities give droplets, pings or a Geiger counter; high densities, a shimmering cloud. Plaits' particle engine sums several and adds a diffuser.</p>
 <p><strong>How it works.</strong> Each impulse retunes the band-pass filter to the centre frequency shifted randomly by up to ±spread semitones, then rings it. The level is compensated for Q and density, so the loudness stays steady. Unlike Plaits, which retunes at most once per 12-sample block, this version retunes on every impulse.</p>
 <table>
@@ -89,11 +89,11 @@ osc.setFrequency(hz * ml::semitonesToRatio(cents / 100.f));</code></pre>
 <tr><td><code>process()</code></td><td>The ringing output; <code>impulse()</code> then holds the raw impulse.</td></tr>
 </table>
 <pre><code>// A Plaits-style particle cloud: three particles into a diffuser
-ml::Particle particles[3];
-ml::Diffuser diffuser;
+pt::Particle particles[3];
+pt::Diffuser diffuser;
 // onSampleRateChange: init each, and diffuser.init(e.sampleRate)
 
-float hz = ml::voltToHz(inputs[VOCT].getVoltage());
+float hz = pt::voltToHz(inputs[VOCT].getVoltage());
 float sum = 0.f;
 for (auto&amp; p : particles) {
     p.setDensity(10.f + 2000.f * params[DENSITY].getValue());

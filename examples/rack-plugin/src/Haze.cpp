@@ -1,4 +1,4 @@
-// Haze: a stereo effects chain built from mutablelib's effects.
+// Haze: a stereo effects chain built from partials's effects.
 //
 //   Overdrive -> Ensemble -> Diffuser -> Reverb -> Limiter
 //
@@ -8,22 +8,22 @@
 
 #include "plugin.hpp"
 
-#include "ml/fx/diffuser.h"
-#include "ml/fx/ensemble.h"
-#include "ml/fx/limiter.h"
-#include "ml/fx/overdrive.h"
-#include "ml/fx/reverb.h"
+#include "pt/fx/diffuser.h"
+#include "pt/fx/ensemble.h"
+#include "pt/fx/limiter.h"
+#include "pt/fx/overdrive.h"
+#include "pt/fx/reverb.h"
 
 struct Haze : Module {
   enum ParamId { DRIVE_PARAM, ENSEMBLE_PARAM, TEXTURE_PARAM, REVERB_PARAM, SIZE_PARAM, TONE_PARAM, PARAMS_LEN };
   enum InputId { LEFT_INPUT, RIGHT_INPUT, INPUTS_LEN };
   enum OutputId { LEFT_OUTPUT, RIGHT_OUTPUT, OUTPUTS_LEN };
 
-  ml::Overdrive driveL, driveR;
-  ml::Ensemble ensemble;
-  ml::Diffuser diffuser;
-  ml::Reverb reverb;
-  ml::Limiter limiter;
+  pt::Overdrive driveL, driveR;
+  pt::Ensemble ensemble;
+  pt::Diffuser diffuser;
+  pt::Reverb reverb;
+  pt::Limiter limiter;
 
   Haze() {
     config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, 0);
@@ -44,7 +44,7 @@ struct Haze : Module {
     driveR.init(e.sampleRate);
     ensemble.init(e.sampleRate);
     diffuser.init(e.sampleRate);
-    reverb.init(e.sampleRate, ml::Reverb::ELEMENTS);
+    reverb.init(e.sampleRate, pt::Reverb::ELEMENTS);
     limiter.init(e.sampleRate);
   }
 

@@ -9,17 +9,17 @@
 #include <cstdio>
 #include <vector>
 
-#include "ml/core/random.h"
-#include "ml/dynamics/lpg.h"
-#include "ml/filter/dc_blocker.h"
-#include "ml/filter/one_pole.h"
-#include "ml/filter/svf.h"
-#include "ml/fx/delay_line.h"
-#include "ml/osc/sine.h"
-#include "ml/physical/modal_resonator.h"
-#include "ml/physical/plucker.h"
-#include "ml/physical/string.h"
-#include "ml/physical/tube.h"
+#include "pt/core/random.h"
+#include "pt/dynamics/lpg.h"
+#include "pt/filter/dc_blocker.h"
+#include "pt/filter/one_pole.h"
+#include "pt/filter/svf.h"
+#include "pt/fx/delay_line.h"
+#include "pt/osc/sine.h"
+#include "pt/physical/modal_resonator.h"
+#include "pt/physical/plucker.h"
+#include "pt/physical/string.h"
+#include "pt/physical/tube.h"
 
 #include "test.h"
 #include "wav.h"
@@ -58,23 +58,23 @@ static float levelDb(const std::vector<float>& x, float sampleRate, float from, 
 
 static void testPlumbing() {
   // SVF low-pass passes DC, high-pass blocks it.
-  ml::Svf svf;
+  pt::Svf svf;
   svf.init(48000.0f);
   svf.setFrequency(1000.0f, 0.707f);
-  ml::SvfOut o = {0, 0, 0};
+  pt::SvfOut o = {0, 0, 0};
   for (int i = 0; i < 48000; ++i) o = svf.process(1.0f);
   CHECK_NEAR(o.lp, 1.0f, 1e-3f);
   CHECK_NEAR(o.hp, 0.0f, 1e-3f);
   // Approximations agree with tan() at low frequencies.
-  for (ml::TanApprox a : {ml::TanApprox::Accurate, ml::TanApprox::Fast, ml::TanApprox::Dirty}) {
-    CHECK_NEAR(ml::tanApprox(0.01f, a), std::tan(3.14159265f * 0.01f), 1e-4f);
+  for (pt::TanApprox a : {pt::TanApprox::Accurate, pt::TanApprox::Fast, pt::TanApprox::Dirty}) {
+    CHECK_NEAR(pt::tanApprox(0.01f, a), std::tan(3.14159265f * 0.01f), 1e-4f);
   }
 
   // One-pole: -3 dB at the cutoff, DC through the low-pass.
-  ml::OnePole op;
+  pt::OnePole op;
   op.init(48000.0f);
   op.setFrequency(1000.0f);
-  ml::OnePoleOut p = {0, 0};
+  pt::OnePoleOut p = {0, 0};
   for (int i = 0; i < 48000; ++i) p = op.process(1.0f);
   CHECK_NEAR(p.lp, 1.0f, 1e-4f);
   CHECK_NEAR(p.hp, 0.0f, 1e-4f);
@@ -87,7 +87,7 @@ static void testPlumbing() {
   CHECK_NEAR(peak, 0.7071f, 0.01f);
 
   // Delay line: read(n) returns the sample written n writes ago.
-  ml::DelayLine d;
+  pt::DelayLine d;
   d.init(100);
   for (int i = 1; i <= 50; ++i) d.write(static_cast<float>(i));
   CHECK(d.read(static_cast<size_t>(1)) == 50.0f);
@@ -96,14 +96,14 @@ static void testPlumbing() {
   CHECK_NEAR(d.readHermite(10.5f), 40.5f, 1e-5f);  // exact on a ramp
 
   // DC blocker removes an offset.
-  ml::DcBlocker dc;
+  pt::DcBlocker dc;
   dc.init(48000.0f, 10.0f);
   float y = 0.0f;
   for (int i = 0; i < 48000; ++i) y = dc.process(1.0f);
   CHECK(std::fabs(y) < 1e-3f);
 
   // Cosine oscillator: 0.5 + 0.5*cos(n*w).
-  ml::CosineOscillator c;
+  pt::CosineOscillator c;
   c.init(0.1f);
   for (int n = 0; n < 20; ++n) {
     CHECK_NEAR(c.next(), 0.5f + 0.5f * std::cos(2.0f * 3.14159265f * 0.1f * n), 1e-4f);
@@ -114,7 +114,7 @@ static void testModalResonator() {
   float hz[3], decay[3];
   for (int r = 0; r < 3; ++r) {
     float sr = kRates[r];
-    ml::ModalResonator res;
+    pt::ModalResonator res;
     res.init(sr);
     res.setFrequency(220.0f);
     res.setStructure(0.27f);  // harmonic
@@ -134,10 +134,10 @@ static void testModalResonator() {
   }
 
   // Full resonator with every knob swept, bowed modes on: stays bounded.
-  ml::ModalResonator res;
+  pt::ModalResonator res;
   res.init(48000.0f);
   res.setBowedModes(true);
-  ml::Random rng;
+  pt::Random rng;
   std::vector<float> out(48000 * 10);
   for (size_t i = 0; i < out.size(); ++i) {
     if (i % 4800 == 0) {
@@ -158,7 +158,7 @@ static void testString() {
   float hz[3], decay[3];
   for (int r = 0; r < 3; ++r) {
     float sr = kRates[r];
-    ml::String s;
+    pt::String s;
     s.init(sr);
     s.setFrequency(110.0f);
     s.setBrightness(0.2f);
@@ -181,10 +181,10 @@ static void testString() {
   }
 
   // Sweep dispersion through both curved bridge and stiff/rattle regions.
-  ml::String s;
+  pt::String s;
   s.init(48000.0f);
   std::vector<float> out(48000 * 8);
-  ml::Random rng;
+  pt::Random rng;
   for (size_t i = 0; i < out.size(); ++i) {
     if (i % 4800 == 0) {
       s.setFrequency(30.0f + rng.uniform() * 1000.0f);
@@ -203,7 +203,7 @@ static void testTube() {
   float hz[3];
   for (int r = 0; r < 3; ++r) {
     float sr = kRates[r];
-    ml::Tube t;
+    pt::Tube t;
     t.init(sr);
     t.setFrequency(220.0f);
     t.setDamping(0.5f);
@@ -218,10 +218,10 @@ static void testTube() {
   for (int r = 0; r < 3; ++r) CHECK_NEAR(hz[r], 220.0f, 3.0f);
 
   // With breath noise: bounded, and a file to listen to.
-  ml::Tube t;
+  pt::Tube t;
   t.init(48000.0f);
   t.setFrequency(220.0f);
-  ml::Random rng;
+  pt::Random rng;
   std::vector<float> out(48000 * 2);
   for (size_t i = 0; i < out.size(); ++i) out[i] = t.process(rng.bipolar() * 0.2f, 0.8f);
   CHECK(allBounded(out, 10.0f));
@@ -229,7 +229,7 @@ static void testTube() {
 }
 
 static void testPlucker() {
-  ml::Plucker p;
+  pt::Plucker p;
   p.init(48000.0f);
   p.setFrequency(220.0f);
   p.setCutoff(4000.0f);
@@ -249,7 +249,7 @@ static void testLpg() {
   float decay[3];
   for (int r = 0; r < 3; ++r) {
     float sr = kRates[r];
-    ml::LowPassGate lpg;
+    pt::LowPassGate lpg;
     lpg.init(sr);
     lpg.setDecay(0.5f);
     lpg.setColour(0.5f);
@@ -267,7 +267,7 @@ static void testLpg() {
   for (int r = 0; r < 3; ++r) CHECK_NEAR(decay[r], decay[1], 0.05f * decay[1] + 0.01f);
 
   // Level mode: closed at 0, open at 1.
-  ml::LowPassGate lpg;
+  pt::LowPassGate lpg;
   lpg.init(48000.0f);
   float y = 0.0f;
   for (int i = 0; i < 48000; ++i) y = lpg.process(1.0f, 0.0f);

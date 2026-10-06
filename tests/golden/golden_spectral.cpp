@@ -17,10 +17,10 @@
 #include "rings/dsp/onset_detector.h"
 #include "stmlib/utils/random.h"
 
-#include "ml/analysis/onset_detector.h"
-#include "ml/filter/hilbert.h"
-#include "ml/spectral/fm_operators.h"
-#include "ml/spectral/xmod.h"
+#include "pt/analysis/onset_detector.h"
+#include "pt/filter/hilbert.h"
+#include "pt/spectral/fm_operators.h"
+#include "pt/spectral/xmod.h"
 
 #include "golden.h"
 
@@ -34,15 +34,15 @@ static void xmod() {
   for (int i = 0; i < 20000; ++i) {
     float a = rnd() * 0.9f, b = rnd() * 0.9f, k = (rnd() + 1.0f) * 0.5f;
     o.push_back(warps::Modulator::Xmod<warps::ALGORITHM_FOLD>(a, b, k));
-    p.push_back(ml::Xmod::fold(a, b, k));
+    p.push_back(pt::Xmod::fold(a, b, k));
     o.push_back(warps::Modulator::Xmod<warps::ALGORITHM_ANALOG_RING_MODULATION>(a, b, k));
-    p.push_back(ml::Xmod::analogRing(a, b, k));
+    p.push_back(pt::Xmod::analogRing(a, b, k));
     o.push_back(warps::Modulator::Xmod<warps::ALGORITHM_DIGITAL_RING_MODULATION>(a, b, k));
-    p.push_back(ml::Xmod::digitalRing(a, b, k));
+    p.push_back(pt::Xmod::digitalRing(a, b, k));
     o.push_back(warps::Modulator::Xmod<warps::ALGORITHM_XOR>(a, b, k));
-    p.push_back(ml::Xmod::bitwiseXor(a, b, k));
+    p.push_back(pt::Xmod::bitwiseXor(a, b, k));
     o.push_back(warps::Modulator::Xmod<warps::ALGORITHM_COMPARATOR>(a, b, k));
-    p.push_back(ml::Xmod::comparator(a, b, k));
+    p.push_back(pt::Xmod::comparator(a, b, k));
   }
   if (getenv("GOLDEN_DEBUG")) {
     for (int k = 0; k < 5; ++k) {
@@ -58,7 +58,7 @@ static void xmod() {
   for (int i = 0; i < 20000; ++i) {
     float a = rnd(), b = rnd(), k = (rnd() + 1.0f) * 0.5f;
     ox.push_back(warps::Modulator::Xmod<warps::ALGORITHM_XFADE>(a, b, k));
-    px.push_back(ml::Xmod::xfade(a, b, k));
+    px.push_back(pt::Xmod::xfade(a, b, k));
   }
   // Not exact: the port computes the sine/cosine curve; Warps reads it from
   // a 257-point table.
@@ -69,7 +69,7 @@ static void hilbert() {
   const float sr = 96000.0f;  // Warps' rate, where its table applies
   warps::QuadratureTransform o;
   o.Init(warps::lut_ap_poles, LUT_AP_POLES_SIZE);
-  ml::Hilbert p;
+  pt::Hilbert p;
   p.init(sr);
   std::vector<float> oi, oq, pi, pq;
   std::vector<float> in = bursts(48000, 4000);
@@ -97,7 +97,7 @@ static void fm() {
     plaits::fm::Operator ops[6];
     for (auto& op : ops) op.Reset();
     float fb[2] = {0.0f, 0.0f};
-    ml::FmOperators p;
+    pt::FmOperators p;
     p.init(sr, 6);
     p.setAlgorithm(algorithm);
     p.setFrequency(hz);
@@ -140,7 +140,7 @@ static void onsets() {
   const int block = 24;
   rings::OnsetDetector o;
   o.Init(8.0f / sr, 160.0f / sr, 1600.0f / sr, sr / block, 0.01f);
-  ml::OnsetDetector p;
+  pt::OnsetDetector p;
   p.init(sr, 0.01f);
   int n = static_cast<int>(sr * 2.6f);
   std::vector<float> x(n);

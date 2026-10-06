@@ -1,7 +1,7 @@
 // Shared helpers for the golden comparison programs.
 
-#ifndef ML_GOLDEN_H_
-#define ML_GOLDEN_H_
+#ifndef PT_GOLDEN_H_
+#define PT_GOLDEN_H_
 
 #include <cmath>
 #include <cstdint>
@@ -57,4 +57,4 @@ inline std::vector<float> bursts(size_t n, size_t period) {
   return x;
 }
 
-#endif  // ML_GOLDEN_H_
+#endif  // PT_GOLDEN_H_

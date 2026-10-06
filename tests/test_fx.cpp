@@ -6,18 +6,18 @@
 #include <cstdio>
 #include <vector>
 
-#include "ml/core/random.h"
-#include "ml/fx/chorus.h"
-#include "ml/fx/decimator.h"
-#include "ml/fx/diffuser.h"
-#include "ml/fx/ensemble.h"
-#include "ml/fx/fx_engine.h"
-#include "ml/fx/limiter.h"
-#include "ml/fx/overdrive.h"
-#include "ml/fx/pitch_shifter.h"
-#include "ml/fx/reverb.h"
-#include "ml/fx/wavefolder.h"
-#include "ml/osc/polyblep.h"
+#include "pt/core/random.h"
+#include "pt/fx/chorus.h"
+#include "pt/fx/decimator.h"
+#include "pt/fx/diffuser.h"
+#include "pt/fx/ensemble.h"
+#include "pt/fx/fx_engine.h"
+#include "pt/fx/limiter.h"
+#include "pt/fx/overdrive.h"
+#include "pt/fx/pitch_shifter.h"
+#include "pt/fx/reverb.h"
+#include "pt/fx/wavefolder.h"
+#include "pt/osc/polyblep.h"
 
 #include "test.h"
 #include "wav.h"
@@ -57,9 +57,9 @@ static float dftMagnitude(const std::vector<float>& x, float sampleRate, float h
 
 static void testEngine() {
   // An impulse written into a line comes back out of its tail.
-  ml::FxEngine e;
+  pt::FxEngine e;
   e.reset();
-  ml::FxEngine::Delay d = e.addDelay(100);
+  pt::FxEngine::Delay d = e.addDelay(100);
   e.allocate();
   int arrival = -1;
   for (int i = 0; i < 200; ++i) {
@@ -75,7 +75,7 @@ static void testEngine() {
 
   // An all-pass passes all energy: impulse in, same total energy out.
   e.reset();
-  ml::FxEngine::Delay ap = e.addDelay(37);
+  pt::FxEngine::Delay ap = e.addDelay(37);
   e.allocate();
   double energy = 0.0;
   for (int i = 0; i < 20000; ++i) {
@@ -101,8 +101,8 @@ struct DocsSaw {
     if (phase >= 1.f) {
       phase -= 1.f;
       float t = phase / inc;
-      out -= ml::thisBlepSample(t);
-      next -= ml::nextBlepSample(t);
+      out -= pt::thisBlepSample(t);
+      next -= pt::nextBlepSample(t);
     }
     next += phase;
     return 2.f * out - 1.f;
@@ -131,18 +131,18 @@ static void testPolyblep() {
 
   // The two halves of a BLEP correction sum to the step's rounding error
   // profile: at t = 0 (jump exactly now) nothing is needed on this sample.
-  CHECK(ml::thisBlepSample(0.0f) == 0.0f);
-  CHECK_NEAR(ml::nextBlepSample(1.0f), 0.0f, 1e-7f);
-  CHECK_NEAR(ml::thisBlepSample(0.5f) - ml::nextBlepSample(0.5f), 0.25f, 1e-7f);
+  CHECK(pt::thisBlepSample(0.0f) == 0.0f);
+  CHECK_NEAR(pt::nextBlepSample(1.0f), 0.0f, 1e-7f);
+  CHECK_NEAR(pt::thisBlepSample(0.5f) - pt::nextBlepSample(0.5f), 0.25f, 1e-7f);
 }
 
 static void testReverb() {
-  const ml::Reverb::Preset presets[] = {ml::Reverb::RINGS, ml::Reverb::ELEMENTS, ml::Reverb::CLOUDS};
-  for (ml::Reverb::Preset preset : presets) {
+  const pt::Reverb::Preset presets[] = {pt::Reverb::RINGS, pt::Reverb::ELEMENTS, pt::Reverb::CLOUDS};
+  for (pt::Reverb::Preset preset : presets) {
     float decay[3];
     for (int r = 0; r < 3; ++r) {
       float sr = kRates[r];
-      ml::Reverb rev;
+      pt::Reverb rev;
       rev.init(sr, preset);
       rev.setAmount(1.0f);
       rev.setTime(0.8f);
@@ -155,7 +155,7 @@ static void testReverb() {
       }
       CHECK(allBounded(out, 2.0f));
       decay[r] = levelDb(out, sr, 0.3f, 0.4f) - levelDb(out, sr, 1.3f, 1.4f);
-      if (preset == ml::Reverb::ELEMENTS && r == 1) writeWav("build/reverb.wav", out, 48000);
+      if (preset == pt::Reverb::ELEMENTS && r == 1) writeWav("build/reverb.wav", out, 48000);
     }
     std::printf("  reverb preset %d: %.1f / %.1f / %.1f dB lost in 1 s\n", preset, decay[0], decay[1], decay[2]);
     CHECK(decay[1] > 3.0f);
@@ -166,7 +166,7 @@ static void testReverb() {
 static void testDiffuser() {
   // Fully wet, the diffuser is all-pass: total energy is preserved.
   for (float sr : kRates) {
-    ml::Diffuser d;
+    pt::Diffuser d;
     d.init(sr);
     d.setAmount(1.0f);
     double inEnergy = 0.0, outEnergy = 0.0;
@@ -183,8 +183,8 @@ static void testDiffuser() {
 static void testModulation() {
   // Chorus and ensemble: bounded; dry when amount = 0.
   for (float sr : kRates) {
-    ml::Chorus ch;
-    ml::Ensemble en;
+    pt::Chorus ch;
+    pt::Ensemble en;
     ch.init(sr);
     en.init(sr);
     ch.setAmount(1.0f);
@@ -209,7 +209,7 @@ static void testModulation() {
 
 static void testPitchShifter() {
   for (float sr : kRates) {
-    ml::PitchShifter ps;
+    pt::PitchShifter ps;
     ps.init(sr);
     ps.setRatio(2.0f);   // up an octave
     ps.setSize(0.6f);
@@ -225,7 +225,7 @@ static void testPitchShifter() {
 }
 
 static void testOverdrive() {
-  ml::Overdrive od;
+  pt::Overdrive od;
   od.init(48000.0f);
   od.setDrive(0.0f);
   // Low drive: small signals pass at roughly unity gain.
@@ -240,7 +240,7 @@ static void testOverdrive() {
 }
 
 static void testWavefolder() {
-  ml::Wavefolder wf;
+  pt::Wavefolder wf;
   wf.init();
   wf.setAmount(0.0f);
   // Nearly linear at low amount: output follows input's sign.
@@ -261,7 +261,7 @@ static void testWavefolder() {
 static void testDecimator() {
   // Reducing to 1 kHz: the output changes value about 1000 times a second.
   for (float sr : kRates) {
-    ml::Decimator d;
+    pt::Decimator d;
     d.init(sr);
     d.setRate(1000.0f);
     std::vector<float> out(static_cast<size_t>(sr));
@@ -275,7 +275,7 @@ static void testDecimator() {
     CHECK(plateaus > 900 && plateaus < 1100);
   }
   // At the host rate, it passes the signal through.
-  ml::Decimator d;
+  pt::Decimator d;
   d.init(48000.0f);
   d.setRate(48000.0f);
   CHECK(d.process(0.25f) == 0.25f);
@@ -283,7 +283,7 @@ static void testDecimator() {
 
 static void testLimiter() {
   for (float sr : kRates) {
-    ml::Limiter lim;
+    pt::Limiter lim;
     lim.init(sr);
     lim.setPreGain(4.0f);   // drive a full-scale sine 12 dB over
     float peak = 0.0f;
@@ -299,8 +299,8 @@ static void testLimiter() {
 
 // The FxEngine example from docs/fx.html, verbatim, to keep it honest.
 struct PingPong {
-    ml::FxEngine e;
-    ml::FxEngine::Delay left, right, diffuse;
+    pt::FxEngine e;
+    pt::FxEngine::Delay left, right, diffuse;
     float damp = 0.f;
 
     void init(float sr) {

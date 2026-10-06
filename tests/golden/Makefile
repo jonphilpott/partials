@@ -1,5 +1,5 @@
 # Golden comparison: compiles Emilie Gillet's original classes next to the
-# mutablelib ports and checks that they produce the same output at the
+# partials ports and checks that they produce the same output at the
 # original sample rate. Needs the eurorack repo and stmlib on disk; it is
 # only for verifying ports and is never part of the library.
 #

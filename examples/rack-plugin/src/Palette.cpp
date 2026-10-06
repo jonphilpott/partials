@@ -1,4 +1,4 @@
-// Palette: six of mutablelib's oscillators behind one set of controls.
+// Palette: six of partials's oscillators behind one set of controls.
 //
 // MODEL picks the oscillator; TIMBRE and COLOR are mapped to each one's
 // most musical pair of controls. Only the selected oscillator runs, which
@@ -7,14 +7,14 @@
 
 #include "plugin.hpp"
 
-#include "ml/core/units.h"
-#include "ml/mod/hysteresis_quantizer.h"
-#include "ml/osc/formant.h"
-#include "ml/osc/grainlet.h"
-#include "ml/osc/string_synth.h"
-#include "ml/osc/variable_shape.h"
-#include "ml/osc/vosim.h"
-#include "ml/osc/z_osc.h"
+#include "pt/core/units.h"
+#include "pt/mod/hysteresis_quantizer.h"
+#include "pt/osc/formant.h"
+#include "pt/osc/grainlet.h"
+#include "pt/osc/string_synth.h"
+#include "pt/osc/variable_shape.h"
+#include "pt/osc/vosim.h"
+#include "pt/osc/z_osc.h"
 
 struct Palette : Module {
   enum ParamId { MODEL_PARAM, PITCH_PARAM, TIMBRE_PARAM, COLOR_PARAM, PARAMS_LEN };
@@ -22,19 +22,19 @@ struct Palette : Module {
   enum OutputId { OUT_OUTPUT, OUTPUTS_LEN };
 
   static const int kNumModels = 6;
-  ml::HysteresisQuantizer modelSelect;
-  ml::VariableShapeOscillator va;
-  ml::FormantOscillator formant;
-  ml::ZOscillator z;
-  ml::VosimOscillator vosim;
-  ml::GrainletOscillator grainlet;
-  ml::StringSynthOscillator strings;
+  pt::HysteresisQuantizer modelSelect;
+  pt::VariableShapeOscillator va;
+  pt::FormantOscillator formant;
+  pt::ZOscillator z;
+  pt::VosimOscillator vosim;
+  pt::GrainletOscillator grainlet;
+  pt::StringSynthOscillator strings;
 
   Palette() {
     config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, 0);
     configSwitch(MODEL_PARAM, 0.f, kNumModels - 1, 0.f, "Model",
                  {"Variable shape", "Formant", "Z (CZ resonance)", "VOSIM", "Grainlet", "String machine"});
-    configParam(PITCH_PARAM, -4.f, 4.f, 0.f, "Pitch", " Hz", 2.f, ml::kFreqC4);
+    configParam(PITCH_PARAM, -4.f, 4.f, 0.f, "Pitch", " Hz", 2.f, pt::kFreqC4);
     configParam(TIMBRE_PARAM, 0.f, 1.f, 0.5f, "Timbre");
     configParam(COLOR_PARAM, 0.f, 1.f, 0.5f, "Color");
     configInput(VOCT_INPUT, "1V/oct");
@@ -56,11 +56,11 @@ struct Palette : Module {
 
   void process(const ProcessArgs& args) override {
     // 1. Controls (knob + CV, 0..1).
-    float hz = ml::voltToHz(params[PITCH_PARAM].getValue() + inputs[VOCT_INPUT].getVoltage());
-    float timbre = ml::clamp(params[TIMBRE_PARAM].getValue() + inputs[TIMBRE_INPUT].getVoltage() / 10.f, 0.f, 1.f);
-    float color = ml::clamp(params[COLOR_PARAM].getValue() + inputs[COLOR_INPUT].getVoltage() / 10.f, 0.f, 1.f);
+    float hz = pt::voltToHz(params[PITCH_PARAM].getValue() + inputs[VOCT_INPUT].getVoltage());
+    float timbre = pt::clamp(params[TIMBRE_PARAM].getValue() + inputs[TIMBRE_INPUT].getVoltage() / 10.f, 0.f, 1.f);
+    float color = pt::clamp(params[COLOR_PARAM].getValue() + inputs[COLOR_INPUT].getVoltage() / 10.f, 0.f, 1.f);
     int model = inputs[MODEL_INPUT].isConnected()
-        ? modelSelect.process(ml::clamp(inputs[MODEL_INPUT].getVoltage() / 10.f, 0.f, 1.f))
+        ? modelSelect.process(pt::clamp(inputs[MODEL_INPUT].getVoltage() / 10.f, 0.f, 1.f))
         : static_cast<int>(params[MODEL_PARAM].getValue());
 
     // 2. Formant frequencies follow the pitch, so timbre is the same on

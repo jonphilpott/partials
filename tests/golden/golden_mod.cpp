@@ -13,12 +13,12 @@
 #include "tides2/poly_slope_generator.h"
 #include "tides2/ramp/ramp_extractor.h"
 
-#include "ml/dynamics/follower.h"
-#include "ml/mod/clock_to_ramp.h"
-#include "ml/mod/envelope.h"
-#include "ml/mod/lag.h"
-#include "ml/mod/quantizer.h"
-#include "ml/mod/slope.h"
+#include "pt/dynamics/follower.h"
+#include "pt/mod/clock_to_ramp.h"
+#include "pt/mod/envelope.h"
+#include "pt/mod/lag.h"
+#include "pt/mod/quantizer.h"
+#include "pt/mod/slope.h"
 
 #include "golden.h"
 
@@ -29,7 +29,7 @@ static void follower() {
   for (size_t i = 0; i < n; ++i) in[i] += 0.3f * std::sin(6.2831853f * 3000.0f * (i / sr)) * (i > n / 2);
   rings::Follower o;
   o.Init(8.0f / sr, 160.0f / sr, 1600.0f / sr);
-  ml::Follower p;
+  pt::Follower p;
   p.init(sr);
   std::vector<float> oe(n), oc(n), pe(n), pc(n);
   for (size_t i = 0; i < n; ++i) {
@@ -58,7 +58,7 @@ static void clockToRamp() {
     previous = clock[i];
     o.Process(false, false, r, &f, &oo[i], 1);
   }
-  ml::ClockToRamp p;
+  pt::ClockToRamp p;
   p.init(sr, 40.0f);
   for (size_t i = 0; i < n; ++i) po[i] = p.process(clock[i]);
   report("clock to ramp", relativeError(oo, po), 1e-4f);
@@ -67,7 +67,7 @@ static void clockToRamp() {
 static void quantizerAndLag() {
   // Quantiser: sweep an input over two octaves at several amounts.
   marbles::Scale scale;
-  const ml::Quantizer::Scale& s = ml::Quantizer::preset(ml::Quantizer::MAJOR);
+  const pt::Quantizer::Scale& s = pt::Quantizer::preset(pt::Quantizer::MAJOR);
   scale.base_interval = s.baseInterval;
   scale.num_degrees = s.numDegrees;
   for (int i = 0; i < s.numDegrees; ++i) {
@@ -76,7 +76,7 @@ static void quantizerAndLag() {
   }
   marbles::Quantizer o;
   o.Init(scale);
-  ml::Quantizer p;
+  pt::Quantizer p;
   p.init(s);
   std::vector<float> oo, po;
   for (int a = 0; a <= 10; ++a) {
@@ -94,7 +94,7 @@ static void quantizerAndLag() {
     float smooth = k / 4.0f;
     marbles::LagProcessor lo;
     lo.Init();
-    ml::Lag lp;
+    pt::Lag lp;
     lp.init();
     uint32_t seed = 3;
     float value = 0.0f;
@@ -118,12 +118,12 @@ static void quantizerAndLag() {
 static void slope() {
   const float sr = 48000.0f;
   const size_t n = 48000, block = 8;
-  struct Case { const char* name; tides::RampMode mode; ml::Slope::Mode pmode; float scale; float smooth; };
+  struct Case { const char* name; tides::RampMode mode; pt::Slope::Mode pmode; float scale; float smooth; };
   const Case cases[] = {
-      {"slope (AD)", tides::RAMP_MODE_AD, ml::Slope::AD, 8.0f, 0.5f},
-      {"slope (AD, smoothed)", tides::RAMP_MODE_AD, ml::Slope::AD, 8.0f, 0.2f},
-      {"slope (looping, folded)", tides::RAMP_MODE_LOOPING, ml::Slope::LOOPING, 5.0f, 0.8f},
-      {"slope (AR)", tides::RAMP_MODE_AR, ml::Slope::AR, 8.0f, 0.5f},
+      {"slope (AD)", tides::RAMP_MODE_AD, pt::Slope::AD, 8.0f, 0.5f},
+      {"slope (AD, smoothed)", tides::RAMP_MODE_AD, pt::Slope::AD, 8.0f, 0.2f},
+      {"slope (looping, folded)", tides::RAMP_MODE_LOOPING, pt::Slope::LOOPING, 5.0f, 0.8f},
+      {"slope (AR)", tides::RAMP_MODE_AR, pt::Slope::AR, 8.0f, 0.5f},
   };
   for (const Case& k : cases) {
     const float hz = 3.0f, pw = 0.3f, shape = 0.7f;
@@ -143,7 +143,7 @@ static void slope() {
                hz / sr, pw, shape, k.smooth, 0.5f, flags, NULL, out, block);
       for (size_t j = 0; j < block; ++j) oo[i + j] = out[j].channel[0] / k.scale;
     }
-    ml::Slope p;
+    pt::Slope p;
     p.init(sr);
     p.setMode(k.pmode);
     p.setFrequency(hz);
@@ -182,7 +182,7 @@ static void envelope() {
   peaks::MultistageEnvelope o;
   o.Init();
   o.set_adsr(attack, decay, sustain, release);
-  ml::Envelope p;
+  pt::Envelope p;
   p.init(sr);
   p.setAdsr(seconds(attack), seconds(decay), sustain / 32767.0f, seconds(release));
   std::vector<float> oo(n), po(n);

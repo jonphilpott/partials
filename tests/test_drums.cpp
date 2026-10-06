@@ -5,14 +5,14 @@
 #include <cstdio>
 #include <vector>
 
-#include "ml/drums/analog_kick.h"
-#include "ml/drums/analog_snare.h"
-#include "ml/drums/fm_drum.h"
-#include "ml/drums/hihat.h"
-#include "ml/drums/synth_kick.h"
-#include "ml/drums/synth_snare.h"
-#include "ml/osc/basic.h"
-#include "ml/osc/sine.h"
+#include "pt/drums/analog_kick.h"
+#include "pt/drums/analog_snare.h"
+#include "pt/drums/fm_drum.h"
+#include "pt/drums/hihat.h"
+#include "pt/drums/synth_kick.h"
+#include "pt/drums/synth_snare.h"
+#include "pt/osc/basic.h"
+#include "pt/osc/sine.h"
 
 #include "test.h"
 #include "wav.h"
@@ -89,13 +89,13 @@ static void checkRates(const char* name, Setup setup, float pitchHz = 0.0f) {
 
 static void testBasicOscillator() {
   // Each shape: correct pitch, bounded, at every rate.
-  const ml::BasicOscillator::Shape shapes[] = {
-      ml::BasicOscillator::SAW, ml::BasicOscillator::TRIANGLE, ml::BasicOscillator::SLOPE,
-      ml::BasicOscillator::SQUARE, ml::BasicOscillator::SQUARE_BRIGHT, ml::BasicOscillator::SQUARE_DARK,
-      ml::BasicOscillator::SQUARE_TRIANGLE};
-  for (ml::BasicOscillator::Shape shape : shapes) {
+  const pt::BasicOscillator::Shape shapes[] = {
+      pt::BasicOscillator::SAW, pt::BasicOscillator::TRIANGLE, pt::BasicOscillator::SLOPE,
+      pt::BasicOscillator::SQUARE, pt::BasicOscillator::SQUARE_BRIGHT, pt::BasicOscillator::SQUARE_DARK,
+      pt::BasicOscillator::SQUARE_TRIANGLE};
+  for (pt::BasicOscillator::Shape shape : shapes) {
     for (float sr : kRates) {
-      ml::BasicOscillator o;
+      pt::BasicOscillator o;
       o.init(sr);
       o.setShape(shape);
       o.setFrequency(220.0f);
@@ -109,7 +109,7 @@ static void testBasicOscillator() {
 }
 
 static void testSineOscillator() {
-  ml::SineOscillator s;
+  pt::SineOscillator s;
   s.init(48000.0f);
   s.setFrequency(1000.0f);
   float maxErr = 0.0f;
@@ -124,7 +124,7 @@ int main() {
   testBasicOscillator();
   testSineOscillator();
 
-  checkRates<ml::AnalogKick>("analog_kick", [](ml::AnalogKick& d, float sr) {
+  checkRates<pt::AnalogKick>("analog_kick", [](pt::AnalogKick& d, float sr) {
     d.init(sr);
     d.setFrequency(55.0f);
     d.setTone(0.4f);
@@ -132,14 +132,14 @@ int main() {
     d.setAttackFm(0.5f);
     d.setSelfFm(0.3f);
   }, 55.0f);
-  checkRates<ml::AnalogSnare>("analog_snare", [](ml::AnalogSnare& d, float sr) {
+  checkRates<pt::AnalogSnare>("analog_snare", [](pt::AnalogSnare& d, float sr) {
     d.init(sr);
     d.setFrequency(180.0f);
     d.setTone(0.5f);
     d.setDecay(0.5f);
     d.setSnappy(0.5f);
   });
-  checkRates<ml::SynthKick>("synth_kick", [](ml::SynthKick& d, float sr) {
+  checkRates<pt::SynthKick>("synth_kick", [](pt::SynthKick& d, float sr) {
     d.init(sr);
     d.setFrequency(50.0f);
     d.setTone(0.3f);
@@ -147,28 +147,28 @@ int main() {
     d.setFmAmount(0.4f);
     d.setFmDecay(0.3f);
   }, 50.0f);
-  checkRates<ml::SynthSnare>("synth_snare", [](ml::SynthSnare& d, float sr) {
+  checkRates<pt::SynthSnare>("synth_snare", [](pt::SynthSnare& d, float sr) {
     d.init(sr);
     d.setFrequency(200.0f);
     d.setFmAmount(0.3f);
     d.setDecay(0.5f);
     d.setSnappy(0.6f);
   });
-  checkRates<ml::HiHat>("hihat_808", [](ml::HiHat& d, float sr) {
-    d.init(sr, ml::HiHat::SQUARE_808);
+  checkRates<pt::HiHat>("hihat_808", [](pt::HiHat& d, float sr) {
+    d.init(sr, pt::HiHat::SQUARE_808);
     d.setFrequency(400.0f);
     d.setTone(0.6f);
     d.setDecay(0.5f);
     d.setNoisiness(0.2f);
   });
-  checkRates<ml::HiHat>("hihat_ring", [](ml::HiHat& d, float sr) {
-    d.init(sr, ml::HiHat::RING_MOD);
+  checkRates<pt::HiHat>("hihat_ring", [](pt::HiHat& d, float sr) {
+    d.init(sr, pt::HiHat::RING_MOD);
     d.setFrequency(400.0f);
     d.setTone(0.6f);
     d.setDecay(0.6f);
     d.setNoisiness(0.2f);
   });
-  checkRates<ml::FmDrum>("fm_drum", [](ml::FmDrum& d, float sr) {
+  checkRates<pt::FmDrum>("fm_drum", [](pt::FmDrum& d, float sr) {
     d.init(sr);
     d.setFrequency(60.0f);
     d.setFmAmount(0.3f);
@@ -178,7 +178,7 @@ int main() {
 
   // Every drum in sustain mode: steady, bounded tone.
   {
-    ml::AnalogKick k;
+    pt::AnalogKick k;
     k.init(48000.0f);
     k.setFrequency(60.0f);
     k.setSustain(true);
@@ -192,7 +192,7 @@ int main() {
   for (int snare = 0; snare < 2; ++snare) {
     for (float x = 0.0f; x <= 1.0f; x += 0.25f) {
       for (float y = 0.0f; y <= 1.0f; y += 0.5f) {
-        ml::FmDrum d;
+        pt::FmDrum d;
         d.init(48000.0f);
         d.morph(x, y, snare != 0);
         std::vector<float> out = hit(d, 48000.0f, 0.5f);

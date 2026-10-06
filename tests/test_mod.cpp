@@ -6,18 +6,18 @@
 #include <cstdio>
 #include <vector>
 
-#include "ml/dynamics/compressor.h"
-#include "ml/dynamics/follower.h"
-#include "ml/dynamics/vactrol.h"
-#include "ml/mod/bouncing_ball.h"
-#include "ml/mod/clock_to_ramp.h"
-#include "ml/mod/envelope.h"
-#include "ml/mod/hysteresis_quantizer.h"
-#include "ml/mod/lag.h"
-#include "ml/mod/lorenz.h"
-#include "ml/mod/quantizer.h"
-#include "ml/mod/random_sequence.h"
-#include "ml/mod/slope.h"
+#include "pt/dynamics/compressor.h"
+#include "pt/dynamics/follower.h"
+#include "pt/dynamics/vactrol.h"
+#include "pt/mod/bouncing_ball.h"
+#include "pt/mod/clock_to_ramp.h"
+#include "pt/mod/envelope.h"
+#include "pt/mod/hysteresis_quantizer.h"
+#include "pt/mod/lag.h"
+#include "pt/mod/lorenz.h"
+#include "pt/mod/quantizer.h"
+#include "pt/mod/random_sequence.h"
+#include "pt/mod/slope.h"
 
 #include "test.h"
 #include "wav.h"
@@ -37,7 +37,7 @@ static void testVactrol() {
   float rise[3], fall[3], pluck[3];
   for (int r = 0; r < 3; ++r) {
     float sr = kRates[r];
-    ml::Vactrol v;
+    pt::Vactrol v;
     v.init(sr);
     v.setAttack(0.02f);
     v.setDecay(0.5f);
@@ -48,7 +48,7 @@ static void testVactrol() {
     rise[r] = timeTo(g, sr, 0.9f, true);
     fall[r] = timeTo(g, sr, 0.1f, false, static_cast<size_t>(sr));
 
-    ml::Vactrol p;
+    pt::Vactrol p;
     p.init(sr);
     p.setPlucked(true);
     p.setDecay(0.5f);
@@ -78,7 +78,7 @@ static float rmsDb(const std::vector<float>& x, size_t from) {
 static void testCompressor() {
   // A full-scale sine (RMS -3 dB), threshold -20 dB, ratio 4: 17 dB over,
   // so the output should sit 17/4 = 4.25 dB over the threshold: -15.75 dB.
-  ml::Compressor c;
+  pt::Compressor c;
   c.init(48000.0f);
   c.setThreshold(-20.0f);
   c.setRatio(4.0f);
@@ -99,7 +99,7 @@ static void testCompressor() {
   CHECK_NEAR(rmsDb(out, 24000), -9.03f, 0.1f);
 
   // Sidechain ducking: a loud sidechain turns down a quiet signal.
-  ml::Compressor d;
+  pt::Compressor d;
   d.init(48000.0f);
   d.setThreshold(-30.0f);
   d.setRatio(10.0f);
@@ -115,7 +115,7 @@ static void testFollower() {
     float envelope = 0.0f;
     const float freqs[2] = {80.0f, 6000.0f};
     for (int k = 0; k < 2; ++k) {
-      ml::Follower f;
+      pt::Follower f;
       f.init(sr);
       for (int i = 0; i < static_cast<int>(sr); ++i) envelope = f.process(0.5f * std::sin(kTwoPi * freqs[k] * i / sr));
       centroid[k] = f.centroid();
@@ -132,7 +132,7 @@ static void testLorenz() {
   float switches[3];
   for (int r = 0; r < 3; ++r) {
     float sr = kRates[r];
-    ml::Lorenz l;
+    pt::Lorenz l;
     l.init(sr);
     l.setRate(0.8f);
     std::vector<float> x(static_cast<size_t>(sr * 10)), z(x.size());
@@ -154,7 +154,7 @@ static void testLorenz() {
 
 static void testEnvelope() {
   for (float sr : kRates) {
-    ml::Envelope e;
+    pt::Envelope e;
     e.init(sr);
     e.setAdsr(0.1f, 0.2f, 0.5f, 0.3f);
     // Gate on for 1 s, then off.
@@ -182,7 +182,7 @@ static void testBouncingBall() {
   float firstBounce[3];
   for (int r = 0; r < 3; ++r) {
     float sr = kRates[r];
-    ml::BouncingBall b;
+    pt::BouncingBall b;
     b.init(sr);
     b.setGravity(0.5f);
     b.setBounce(0.5f);
@@ -201,9 +201,9 @@ static void testBouncingBall() {
 static void testSlope() {
   for (float sr : kRates) {
     // AD at 2 Hz: one 0.5 s envelope, rising to 1 at the slope point.
-    ml::Slope s;
+    pt::Slope s;
     s.init(sr);
-    s.setMode(ml::Slope::AD);
+    s.setMode(pt::Slope::AD);
     s.setFrequency(2.0f);
     s.setSlope(0.5f);
     std::vector<float> ad(static_cast<size_t>(sr));
@@ -215,9 +215,9 @@ static void testSlope() {
     CHECK_NEAR(timeTo(ad, sr, 0.001f, false, static_cast<size_t>(sr * 0.3f)) + 0.3f, 0.5f, 0.01f);
 
     // Looping at 5 Hz: ±1, 5 cycles per second.
-    ml::Slope lfo;
+    pt::Slope lfo;
     lfo.init(sr);
-    lfo.setMode(ml::Slope::LOOPING);
+    lfo.setMode(pt::Slope::LOOPING);
     lfo.setFrequency(5.0f);
     std::vector<float> l(static_cast<size_t>(sr));
     for (size_t i = 0; i < l.size(); ++i) l[i] = lfo.process(false);
@@ -225,10 +225,10 @@ static void testSlope() {
     CHECK_NEAR(zeroCrossingHz(l, sr), 5.0f, 0.5f);
 
     // Audio range, sweeping every knob: bounded.
-    ml::Slope osc;
+    pt::Slope osc;
     osc.init(sr);
-    osc.setMode(ml::Slope::LOOPING);
-    osc.setRange(ml::Slope::AUDIO);
+    osc.setMode(pt::Slope::LOOPING);
+    osc.setRange(pt::Slope::AUDIO);
     std::vector<float> a(static_cast<size_t>(sr));
     for (size_t i = 0; i < a.size(); ++i) {
       float t = static_cast<float>(i) / a.size();
@@ -241,9 +241,9 @@ static void testSlope() {
     CHECK(allBounded(a, 1.5f));
 
     // AR: holds at 1 while the gate is high, then falls.
-    ml::Slope ar;
+    pt::Slope ar;
     ar.init(sr);
-    ar.setMode(ml::Slope::AR);
+    ar.setMode(pt::Slope::AR);
     ar.setFrequency(10.0f);
     float held = 0.0f;
     for (int i = 0; i < static_cast<int>(sr * 0.5f); ++i) held = ar.process(true);
@@ -260,7 +260,7 @@ static void testClockToRamp() {
   const float sr = 48000.0f;
   // A steady 2 Hz clock: after a few pulses the ramp wraps on each pulse.
   for (int mult = 1; mult <= 2; ++mult) {
-    ml::ClockToRamp c;
+    pt::ClockToRamp c;
     c.init(sr);
     c.setRatio(mult, 1);
     int wraps = 0;
@@ -278,7 +278,7 @@ static void testClockToRamp() {
   // pattern, the ramp reads about 0.9 at 90% of every period, long or
   // short. (Without prediction it would run at the average speed and be
   // off by about 20% on each.)
-  ml::ClockToRamp c;
+  pt::ClockToRamp c;
   c.init(sr);
   std::vector<int> pulses;
   for (int t = 0, k = 0; t < static_cast<int>(sr * 10); t += static_cast<int>(sr * ((k++ & 1) ? 0.2f : 0.3f))) {
@@ -303,7 +303,7 @@ static void testClockToRamp() {
 
 static void testQuantizers() {
   // HysteresisQuantizer: 4 steps; hovering at a boundary doesn't flicker.
-  ml::HysteresisQuantizer h;
+  pt::HysteresisQuantizer h;
   h.init(4);
   CHECK(h.process(0.1f) == 0);
   CHECK(h.process(0.35f) == 1);
@@ -314,8 +314,8 @@ static void testQuantizers() {
   CHECK(h.process(0.4f) == 1);    // clearly under: moves
   CHECK(h.process(0.9f) == 3);
 
-  ml::Quantizer q;
-  q.init(ml::Quantizer::preset(ml::Quantizer::MAJOR));
+  pt::Quantizer q;
+  q.init(pt::Quantizer::preset(pt::Quantizer::MAJOR));
   CHECK(q.process(0.37f, 0.0f) == 0.37f);                     // off
   CHECK_NEAR(q.process(0.37f, 0.2f, false), 0.3333f, 1e-4f);  // chromatic: nearest semitone (E)
   CHECK_NEAR(q.process(1.45f, 1.0f, false), 1.0f, 1e-4f);     // root only: C
@@ -326,7 +326,7 @@ static void testQuantizers() {
 }
 
 static void testLag() {
-  ml::Lag l;
+  pt::Lag l;
   l.init();
   // Smoothness 0: instant.
   CHECK_NEAR(l.process(1.0f, 0.0f, 0.01f), 1.0f, 1e-3f);
@@ -341,7 +341,7 @@ static void testLag() {
 
 static void testRandomSequence() {
   // Deja vu 0.5: locked; the sequence repeats every `length` steps.
-  ml::RandomSequence r;
+  pt::RandomSequence r;
   r.init();
   r.setLength(5);
   r.setDejaVu(0.5f);

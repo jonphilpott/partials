@@ -1,5 +1,5 @@
 // Bridge: two inputs, three ways of combining them, built from
-// mutablelib's spectral parts (all from Warps).
+// partials's spectral parts (all from Warps).
 //
 //   XMOD:    Xmod::morph sweeps crossfade, fold, ring mods, XOR, comparator
 //   SHIFT:   the carrier frequency-shifted (Hilbert + quadrature sine)
@@ -10,18 +10,18 @@
 
 #include "plugin.hpp"
 
-#include "ml/core/math.h"
-#include "ml/filter/hilbert.h"
-#include "ml/spectral/vocoder.h"
-#include "ml/spectral/xmod.h"
+#include "pt/core/math.h"
+#include "pt/filter/hilbert.h"
+#include "pt/spectral/vocoder.h"
+#include "pt/spectral/xmod.h"
 
 struct Bridge : Module {
   enum ParamId { ALGORITHM_PARAM, TIMBRE_PARAM, SHIFT_PARAM, RELEASE_PARAM, PARAMS_LEN };
   enum InputId { CARRIER_INPUT, MODULATOR_INPUT, ALGORITHM_INPUT, SHIFT_INPUT, INPUTS_LEN };
   enum OutputId { XMOD_OUTPUT, SHIFT_OUTPUT, VOCODER_OUTPUT, OUTPUTS_LEN };
 
-  ml::Hilbert hilbert;
-  ml::Vocoder vocoder;
+  pt::Hilbert hilbert;
+  pt::Vocoder vocoder;
   float shiftPhase = 0.f;
 
   Bridge() {
@@ -49,9 +49,9 @@ struct Bridge : Module {
     float modulator = inputs[MODULATOR_INPUT].getVoltage() / 5.f;
 
     // 1. Cross-modulation, one knob through all of Warps' algorithms.
-    float algorithm = ml::clamp(params[ALGORITHM_PARAM].getValue() + inputs[ALGORITHM_INPUT].getVoltage() / 10.f, 0.f, 1.f);
-    float xmod = ml::Xmod::morph(algorithm, modulator, carrier, params[TIMBRE_PARAM].getValue());
-    outputs[XMOD_OUTPUT].setVoltage(5.f * ml::clamp(xmod, -2.f, 2.f));
+    float algorithm = pt::clamp(params[ALGORITHM_PARAM].getValue() + inputs[ALGORITHM_INPUT].getVoltage() / 10.f, 0.f, 1.f);
+    float xmod = pt::Xmod::morph(algorithm, modulator, carrier, params[TIMBRE_PARAM].getValue());
+    outputs[XMOD_OUTPUT].setVoltage(5.f * pt::clamp(xmod, -2.f, 2.f));
 
     // 2. Frequency shifter: rotate the carrier's analytic signal (I, Q)
     // by a sine/cosine at the shift frequency.

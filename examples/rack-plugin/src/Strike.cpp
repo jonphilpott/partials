@@ -1,4 +1,4 @@
-// Strike: a small voice built from three mutablelib parts.
+// Strike: a small voice built from three partials parts.
 //
 //   Plucker  ->  ModalResonator  ->  LowPassGate
 //   (burst)      (the object)        (vactrol VCA + filter)
@@ -9,11 +9,11 @@
 
 #include "plugin.hpp"
 
-#include "ml/core/units.h"
-#include "ml/dynamics/lpg.h"
-#include "ml/filter/dc_blocker.h"
-#include "ml/physical/modal_resonator.h"
-#include "ml/physical/plucker.h"
+#include "pt/core/units.h"
+#include "pt/dynamics/lpg.h"
+#include "pt/filter/dc_blocker.h"
+#include "pt/physical/modal_resonator.h"
+#include "pt/physical/plucker.h"
 
 struct Strike : Module {
   enum ParamId {
@@ -28,15 +28,15 @@ struct Strike : Module {
   enum InputId { VOCT_INPUT, TRIG_INPUT, IN_INPUT, INPUTS_LEN };
   enum OutputId { OUT_OUTPUT, OUTPUTS_LEN };
 
-  ml::Plucker plucker;
-  ml::ModalResonator resonator;
-  ml::LowPassGate lpg;
-  ml::DcBlocker dcBlocker;
+  pt::Plucker plucker;
+  pt::ModalResonator resonator;
+  pt::LowPassGate lpg;
+  pt::DcBlocker dcBlocker;
   dsp::SchmittTrigger trigger;
 
   Strike() {
     config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, 0);
-    configParam(PITCH_PARAM, -3.f, 3.f, 0.f, "Pitch", " Hz", 2.f, ml::kFreqC4);
+    configParam(PITCH_PARAM, -3.f, 3.f, 0.f, "Pitch", " Hz", 2.f, pt::kFreqC4);
     configParam(STRUCTURE_PARAM, 0.f, 1.f, 0.27f, "Structure");
     configParam(BRIGHTNESS_PARAM, 0.f, 1.f, 0.6f, "Brightness");
     configParam(DAMPING_PARAM, 0.f, 1.f, 0.6f, "Damping");
@@ -57,7 +57,7 @@ struct Strike : Module {
   }
 
   void process(const ProcessArgs& args) override {
-    float hz = ml::voltToHz(params[PITCH_PARAM].getValue() + inputs[VOCT_INPUT].getVoltage());
+    float hz = pt::voltToHz(params[PITCH_PARAM].getValue() + inputs[VOCT_INPUT].getVoltage());
     float brightness = params[BRIGHTNESS_PARAM].getValue();
     float position = params[POSITION_PARAM].getValue();
 

@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Getting started · mutablelib</title>
+<title>Getting started · partials</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="page">
 <nav>
-  <div class="title">mutablelib</div>
+  <div class="title">partials</div>
   <a href="index.html">Overview</a>
   <a href="setup.html" class="here">Getting started</a>
   <a href="tutorial.html">Tutorial</a>
@@ -98,7 +98,7 @@ export RACK_DIR=~/git/Rack-SDK</code></pre>
 <pre><code>cd examples/rack-plugin
 make             # build plugin.dylib / plugin.dll / plugin.so
 make install     # build, package and install into Rack's user folder</code></pre>
-<p>Restart Rack. The modules appear in the module browser under the brand <strong>mutablelib</strong>.</p>
+<p>Restart Rack. The modules appear in the module browser under the brand <strong>partials</strong>.</p>
 <p><code>make install</code> copies the packaged plugin into the <code>plugins-&lt;os&gt;-&lt;cpu&gt;</code> folder inside Rack's user folder. Rack unpacks it on its next start. Rack can open the user folder for you from <em>Help → Open user folder</em>.</p>
 <table>
 <tr><th>System</th><th>Plugins folder</th></tr>
@@ -109,17 +109,17 @@ make install     # build, package and install into Rack's user folder</code></pr
 <p>Other useful targets:</p>
 <table>
 <tr><th>Command</th><th>Does</th></tr>
-<tr><td><code>make dist</code></td><td>Builds a distributable package: <code>dist/MutablelibDemo-2.0.0-&lt;os&gt;-&lt;cpu&gt;.vcvplugin</code>.</td></tr>
+<tr><td><code>make dist</code></td><td>Builds a distributable package: <code>dist/PartialsDemo-2.0.0-&lt;os&gt;-&lt;cpu&gt;.vcvplugin</code>.</td></tr>
 <tr><td><code>make clean</code></td><td>Removes build files.</td></tr>
 <tr><td><code>make -j8</code></td><td>Compiles 8 files at once.</td></tr>
 </table>
 <p><code>examples/tutorial-plugin</code> holds the finished module from the <a href="tutorial.html">tutorial</a>, and builds the same way.</p>
-<p>The example's <code>Makefile</code> points at the library with a relative path (<code>FLAGS += -I../../include</code>). If you move the example elsewhere, change that path to wherever <code>mutablelib/include</code> lives.</p>
+<p>The example's <code>Makefile</code> points at the library with a relative path (<code>FLAGS += -I../../include</code>). If you move the example elsewhere, change that path to wherever <code>partials/include</code> lives.</p>
 
 <h3>If it doesn't build</h3>
 <ul>
   <li><strong>"No rule to make target …/plugin.mk":</strong> <code>RACK_DIR</code> isn't set, or points at the wrong folder. <code>ls $RACK_DIR/plugin.mk</code> should list the file. You can also pass it directly: <code>make RACK_DIR=~/git/Rack-SDK</code>.</li>
-  <li><strong>"ml/…h: No such file":</strong> the include path in the Makefile doesn't reach <code>mutablelib/include</code>.</li>
+  <li><strong>"pt/…h: No such file":</strong> the include path in the Makefile doesn't reach <code>partials/include</code>.</li>
   <li><strong>On Windows, compiler or linker not found:</strong> you are in the MSYS shell rather than the MinGW 64-bit shell.</li>
   <li><strong>The module doesn't appear in Rack:</strong> check Rack's log (<code>log.txt</code> in the user folder). An "incompatible" message means the SDK is newer than your Rack.</li>
 </ul>
@@ -133,31 +133,31 @@ $RACK_DIR/helper.py createplugin MyPlugin
 cd MyPlugin</code></pre></li>
   <li>Draw a panel (an SVG in <code>res/</code>) and generate a module from it:
 <pre><code>$RACK_DIR/helper.py createmodule MyModule res/MyModule.svg src/MyModule.cpp</code></pre></li>
-  <li>Point the plugin's <code>Makefile</code> at mutablelib by adding one line before <code>include $(RACK_DIR)/plugin.mk</code>. The library is header-only, so there is nothing else to build or link.
+  <li>Point the plugin's <code>Makefile</code> at partials by adding one line before <code>include $(RACK_DIR)/plugin.mk</code>. The library is header-only, so there is nothing else to build or link.
 <pre><code># Makefile
-FLAGS += -I../mutablelib/include</code></pre></li>
+FLAGS += -I../partials/include</code></pre></li>
   <li>Include components and use them. The <a href="index.html">overview</a> shows the pattern every component follows:
 <pre><code>#include "plugin.hpp"
-#include "ml/physical/string.h"
+#include "pt/physical/string.h"
 
 struct MyModule : Module {
-    ml::String string;
+    pt::String string;
 
     void onSampleRateChange(const SampleRateChangeEvent&amp; e) override {
         string.init(e.sampleRate);
     }
 
     void process(const ProcessArgs&amp; args) override {
-        string.setFrequency(ml::voltToHz(inputs[VOCT_INPUT].getVoltage()));
+        string.setFrequency(pt::voltToHz(inputs[VOCT_INPUT].getVoltage()));
         outputs[OUT_OUTPUT].setVoltage(5.f * string.process(inputs[IN_INPUT].getVoltage() / 5.f));
     }
 };</code></pre></li>
   <li>Build and install with <code>make install</code>, as for the examples.</li>
 </ol>
-<p>Instead of a relative path, you can keep mutablelib inside your plugin's repository, for example as a git submodule:</p>
-<pre><code>git submodule add &lt;mutablelib repository URL&gt; dep/mutablelib
+<p>Instead of a relative path, you can keep partials inside your plugin's repository, for example as a git submodule:</p>
+<pre><code>git submodule add &lt;partials repository URL&gt; dep/partials
 # Makefile
-FLAGS += -Idep/mutablelib/include</code></pre>
+FLAGS += -Idep/partials/include</code></pre>
 <p>If you publish a plugin, keep the library's <code>LICENSE</code> file with it: it is MIT-licensed, and the notice credits Emilie Gillet, whose code it is derived from.</p>
 
 <h2>5. Run the library's tests (optional)</h2>
@@ -170,7 +170,7 @@ make check</code></pre>
 cd ~/git/eurorack
 git submodule update --init stmlib
 
-cd /path/to/mutablelib/tests/golden
+cd /path/to/partials/tests/golden
 make check EURORACK=~/git/eurorack</code></pre>
 
 </main>

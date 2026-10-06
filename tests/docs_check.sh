@@ -1,7 +1,7 @@
 #!/bin/sh
 # Checks the hand-written docs cover the code:
-#  1. every header include/ml/<cat>/<name>.h has an element id="<cat>-<name>"
-#  2. every inline function in include/ml/core/<file>.h has an element
+#  1. every header include/pt/<cat>/<name>.h has an element id="<cat>-<name>"
+#  2. every inline function in include/pt/core/<file>.h has an element
 #     id="core-<file>-<function>"
 #  3. every documented section (an <h2>/<h3> with an id) contains at least
 #     one <pre> code example before the next heading
@@ -11,11 +11,11 @@ cd "$(dirname "$0")/.." || exit 1
 missing=0
 docs=docs/*.html
 
-for h in $(cd include/ml && find . -name '*.h' -path './*/*' | sed 's|^\./||;s|\.h$||;s|/|-|g'); do
+for h in $(cd include/pt && find . -name '*.h' -path './*/*' | sed 's|^\./||;s|\.h$||;s|/|-|g'); do
   grep -q "id=\"$h\"" $docs || { echo "docs: no section for header $h"; missing=1; }
 done
 
-for f in include/ml/core/*.h; do
+for f in include/pt/core/*.h; do
   base=$(basename "$f" .h)
   for fn in $(sed -n 's/^inline [^(]* \**\([A-Za-z0-9_]*\)(.*/\1/p' "$f"); do
     grep -q "id=\"core-$base-$fn\"" $docs || { echo "docs: no section for core function $base/$fn"; missing=1; }

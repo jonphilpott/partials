@@ -1,10 +1,10 @@
-// Golden comparison: original Gillet classes vs mutablelib ports, at the
+// Golden comparison: original Gillet classes vs partials ports, at the
 // original sample rate, with the original block size matching the port's
 // control period.
 //
 // Expected differences:
 // - stmlib's SemitonesToRatio() uses lookup tables accurate to about
-//   1/256 semitone; mutablelib uses exp2(). Components that convert
+//   1/256 semitone; partials uses exp2(). Components that convert
 //   semitones (string decay, LPG rates) drift slightly over time.
 // - Ports that resample internally (the tube) are one sample later.
 // - The tube's tuning is corrected (see physical/tube.h).
@@ -40,20 +40,20 @@ namespace rings { using namespace stmlib; }
 #include "clouds/dsp/fx/reverb.h"
 
 // Ports.
-#include "ml/dynamics/lpg.h"
-#include "ml/physical/modal_resonator.h"
-#include "ml/physical/plucker.h"
-#include "ml/physical/string.h"
-#include "ml/physical/tube.h"
-#include "ml/fx/chorus.h"
-#include "ml/fx/decimator.h"
-#include "ml/fx/diffuser.h"
-#include "ml/fx/ensemble.h"
-#include "ml/fx/limiter.h"
-#include "ml/fx/overdrive.h"
-#include "ml/fx/pitch_shifter.h"
-#include "ml/fx/reverb.h"
-#include "ml/fx/wavefolder.h"
+#include "pt/dynamics/lpg.h"
+#include "pt/physical/modal_resonator.h"
+#include "pt/physical/plucker.h"
+#include "pt/physical/string.h"
+#include "pt/physical/tube.h"
+#include "pt/fx/chorus.h"
+#include "pt/fx/decimator.h"
+#include "pt/fx/diffuser.h"
+#include "pt/fx/ensemble.h"
+#include "pt/fx/limiter.h"
+#include "pt/fx/overdrive.h"
+#include "pt/fx/pitch_shifter.h"
+#include "pt/fx/reverb.h"
+#include "pt/fx/wavefolder.h"
 
 
 #include "golden.h"
@@ -75,7 +75,7 @@ static void resonator() {
     std::vector<float> oOdd(n), oEven(n);
     for (size_t i = 0; i < n; i += block) o.Process(&in[i], &oOdd[i], &oEven[i], block);
 
-    ml::ModalResonator p;
+    pt::ModalResonator p;
     p.init(sr);
     p.setFrequency(147.0f);
     p.setStructure(st);
@@ -100,7 +100,7 @@ static void string() {
   const size_t block = 16, n = 32000 * 2;
   std::vector<float> in = bursts(n, 16000);
   // Internal dispersion values, and the knob positions that give them in
-  // each version (Elements and mutablelib map the knob differently).
+  // each version (Elements and partials map the knob differently).
   const float dispersion[] = {-0.5f, 0.0f, 0.3f, 0.9f};
   for (float d : dispersion) {
     float elementsKnob = d < 0.0f ? 0.24f + d / 4.166f : (d > 0.0f ? 0.26f + d / 1.35135f : 0.25f);
@@ -117,7 +117,7 @@ static void string() {
     std::vector<float> oOut(n, 0.0f), oAux(n, 0.0f);
     for (size_t i = 0; i < n; i += block) o.Process(&in[i], &oOut[i], &oAux[i], block);
 
-    ml::String p;
+    pt::String p;
     p.init(sr);
     p.setFrequency(98.0f);
     p.setDispersion(mlKnob);
@@ -161,7 +161,7 @@ static void tube() {
   std::vector<float> oOut(n);
   for (size_t i = 0; i < n; ++i) oOut[i] = io[i] - breath[i];
 
-  ml::Tube p;
+  pt::Tube p;
   p.init(sr);
   // The port takes the sounding pitch (an octave below the loop) and
   // removes half a sample of delay to correct the tuning. Pick the pitch
@@ -186,7 +186,7 @@ static void plucker() {
   std::vector<float> oOut(n);
   for (size_t i = 0; i < n; i += block) o.Process(&oOut[i], block);
 
-  ml::Plucker p;
+  pt::Plucker p;
   p.init(sr);
   p.setFrequency(330.0f);
   p.setCutoff(6000.0f);
@@ -220,7 +220,7 @@ static void lpg() {
     o.Process(env.gain(), env.frequency(), env.hf_bleed(), &oOut[i], block);
   }
 
-  ml::LowPassGate p;
+  pt::LowPassGate p;
   p.init(sr);
   p.setDecay(decay);
   p.setColour(colour);
@@ -252,13 +252,13 @@ static void runOriginalReverb(Original& o, std::vector<float>& l, std::vector<fl
 
 static void reverbs() {
   static uint16_t buffer[32768];
-  struct Case { const char* name; ml::Reverb::Preset preset; float sr; float tolerance; };
+  struct Case { const char* name; pt::Reverb::Preset preset; float sr; float tolerance; };
   const Case cases[] = {
-    {"reverb (Rings)", ml::Reverb::RINGS, 48000.0f, 2e-3f},
-    {"reverb (Elements)", ml::Reverb::ELEMENTS, 32000.0f, 2e-3f},
+    {"reverb (Rings)", pt::Reverb::RINGS, 48000.0f, 2e-3f},
+    {"reverb (Elements)", pt::Reverb::ELEMENTS, 32000.0f, 2e-3f},
     // 12-bit steps are 16x coarser than 16-bit, and the same topology
     // differs by ~1.4e-3 at 16-bit (Elements), so expect ~2e-2 here.
-    {"reverb (Clouds, 12-bit)", ml::Reverb::CLOUDS, 32000.0f, 3e-2f},
+    {"reverb (Clouds, 12-bit)", pt::Reverb::CLOUDS, 32000.0f, 3e-2f},
   };
   for (const Case& k : cases) {
     const size_t n = static_cast<size_t>(k.sr * 2);
@@ -266,13 +266,13 @@ static void reverbs() {
     stereoSignal(n, k.sr, l, r);
     std::vector<float> ol = l, orr = r;
     std::memset(buffer, 0, sizeof buffer);
-    if (k.preset == ml::Reverb::RINGS) {
+    if (k.preset == pt::Reverb::RINGS) {
       // Static: the original never initialises its loop filter state.
       static rings::Reverb o;
       o.Init(buffer);
       o.set_amount(0.5f); o.set_input_gain(0.2f); o.set_time(0.8f); o.set_diffusion(0.625f); o.set_lp(0.7f);
       runOriginalReverb(o, ol, orr, 24);
-    } else if (k.preset == ml::Reverb::ELEMENTS) {
+    } else if (k.preset == pt::Reverb::ELEMENTS) {
       // Static: the original never initialises its loop filter state.
       static elements::Reverb o;
       o.Init(buffer);
@@ -288,7 +288,7 @@ static void reverbs() {
       for (size_t i = 0; i < n; i += 32) o.Process(&frames[i], 32);
       for (size_t i = 0; i < n; ++i) { ol[i] = frames[i].l; orr[i] = frames[i].r; }
     }
-    ml::Reverb p;
+    pt::Reverb p;
     p.init(k.sr, k.preset);
     p.setAmount(0.5f); p.setInputGain(0.2f); p.setTime(0.8f); p.setDiffusion(0.625f); p.setLp(0.7f);
     std::vector<float> pl = l, pr = r;
@@ -309,7 +309,7 @@ static void diffuser() {
   std::vector<clouds::FloatFrame> frames(n);
   for (size_t i = 0; i < n; ++i) { frames[i].l = l[i]; frames[i].r = r[i]; }
   for (size_t i = 0; i < n; i += 32) o.Process(&frames[i], 32);
-  ml::Diffuser p;
+  pt::Diffuser p;
   p.init(sr);
   p.setAmount(0.8f);
   std::vector<float> ol(n), orr(n), pl = l, pr = r;
@@ -334,7 +334,7 @@ static void chorusAndEnsemble() {
     o.set_depth(0.6f);
     std::vector<float> ol = l, orr = r;
     for (size_t i = 0; i < n; i += 24) o.Process(&ol[i], &orr[i], 24);
-    ml::Chorus p;
+    pt::Chorus p;
     p.init(sr);
     p.setAmount(0.7f);
     p.setDepth(0.6f);
@@ -350,7 +350,7 @@ static void chorusAndEnsemble() {
     o.set_depth(0.6f);
     std::vector<float> ol = l, orr = r;
     for (size_t i = 0; i < n; i += 24) o.Process(&ol[i], &orr[i], 24);
-    ml::Ensemble p;
+    pt::Ensemble p;
     p.init(sr);
     p.setAmount(0.7f);
     p.setDepth(0.6f);
@@ -373,7 +373,7 @@ static void pitchShifter() {
   std::vector<clouds::FloatFrame> frames(n);
   for (size_t i = 0; i < n; ++i) { frames[i].l = r[i]; frames[i].r = 0.0f; }
   o.Process(&frames[0], n);
-  ml::PitchShifter p;
+  pt::PitchShifter p;
   p.init(sr);
   p.setRatio(1.5f);
   p.setSize(1.0f);
@@ -399,7 +399,7 @@ static void overdriveDecimatorLimiter() {
     o.Init();
     std::vector<float> oo = x;
     for (size_t i = 0; i < n; i += 12) o.Process(0.5f + 0.5f * knob, &oo[i], 12);
-    ml::Overdrive p;
+    pt::Overdrive p;
     p.setDrive(knob);
     p.init(sr);
     std::vector<float> po(n);
@@ -413,7 +413,7 @@ static void overdriveDecimatorLimiter() {
     o.Init();
     std::vector<float> oo = x;
     for (size_t i = 0; i < n; i += 12) o.Process<false>(3300.0f / sr, &oo[i], 12);
-    ml::Decimator p;
+    pt::Decimator p;
     p.init(sr);
     p.setRate(3300.0f);
     std::vector<float> po(n);
@@ -428,7 +428,7 @@ static void overdriveDecimatorLimiter() {
     for (size_t i = 0; i < n; ++i) orr[i] *= -0.5f;
     std::vector<float> pl = ol, pr = orr;
     for (size_t i = 0; i < n; i += 24) o.Process(&ol[i], &orr[i], 24, 3.0f);
-    ml::Limiter p;
+    pt::Limiter p;
     p.init(sr);
     p.setPreGain(3.0f);
     for (size_t i = 0; i < n; ++i) p.process(pl[i], pr[i]);
@@ -438,7 +438,7 @@ static void overdriveDecimatorLimiter() {
 
 static void wavefolder() {
   // Compare the folding curves directly against Plaits' tables.
-  ml::Wavefolder p;
+  pt::Wavefolder p;
   p.init();
   p.setAmount(1.0f);
   const float gain = 0.03f + 0.46f;

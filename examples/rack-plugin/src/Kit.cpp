@@ -1,4 +1,4 @@
-// Kit: three 808-style drum voices built from mutablelib's drums.
+// Kit: three 808-style drum voices built from partials's drums.
 //
 // Each voice has a trigger input, tune and decay knobs and its own output;
 // a mix output sums all three. The pattern for every drum: a plain member,
@@ -7,10 +7,10 @@
 
 #include "plugin.hpp"
 
-#include "ml/core/units.h"
-#include "ml/drums/analog_kick.h"
-#include "ml/drums/analog_snare.h"
-#include "ml/drums/hihat.h"
+#include "pt/core/units.h"
+#include "pt/drums/analog_kick.h"
+#include "pt/drums/analog_snare.h"
+#include "pt/drums/hihat.h"
 
 struct Kit : Module {
   enum ParamId {
@@ -22,9 +22,9 @@ struct Kit : Module {
   enum InputId { KICK_TRIG_INPUT, SNARE_TRIG_INPUT, HAT_TRIG_INPUT, INPUTS_LEN };
   enum OutputId { KICK_OUTPUT, SNARE_OUTPUT, HAT_OUTPUT, MIX_OUTPUT, OUTPUTS_LEN };
 
-  ml::AnalogKick kick;
-  ml::AnalogSnare snare;
-  ml::HiHat hat;
+  pt::AnalogKick kick;
+  pt::AnalogSnare snare;
+  pt::HiHat hat;
   dsp::SchmittTrigger kickTrig, snareTrig, hatTrig;
 
   Kit() {
@@ -48,7 +48,7 @@ struct Kit : Module {
   void onSampleRateChange(const SampleRateChangeEvent& e) override {
     kick.init(e.sampleRate);
     snare.init(e.sampleRate);
-    hat.init(e.sampleRate, ml::HiHat::SQUARE_808);
+    hat.init(e.sampleRate, pt::HiHat::SQUARE_808);
   }
 
   void process(const ProcessArgs& args) override {

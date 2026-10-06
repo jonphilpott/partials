@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Dynamics · mutablelib</title>
+<title>Dynamics · partials</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="page">
 <nav>
-  <div class="title">mutablelib</div>
+  <div class="title">partials</div>
   <a href="index.html">Overview</a>
   <a href="setup.html">Getting started</a>
   <a href="tutorial.html">Tutorial</a>
@@ -31,7 +31,7 @@
 
 <!-- ===================================================================== -->
 <h2 id="dynamics-lpg">LowPassGate</h2>
-<p class="origin"><code>#include "ml/dynamics/lpg.h"</code> · from Plaits</p>
+<p class="origin"><code>#include "pt/dynamics/lpg.h"</code> · from Plaits</p>
 <p>A combined VCA and low-pass filter driven by a model of a vactrol. As a note decays it gets quieter and darker together, the soft "bongo" sound of West Coast synthesis. The envelope is built in: ping it with a trigger, or drive it with a level CV.</p>
 <p><strong>How it works.</strong> A vactrol is an LED shining on a light-dependent resistor. It responds fast when the light comes on and slowly, with a long tail, when it goes off. The model has one internal state that rises quickly and falls with that same slowing tail, and the state drives three things:</p>
 <ul>
@@ -50,7 +50,7 @@
 </table>
 <p><strong>Cost:</strong> one filter per sample. The envelope updates 4000 times a second, and the gain is ramped smoothly between updates.</p>
 <pre><code>// A complete LPG module: trigger pings it; a LEVEL cable switches to CV control
-ml::LowPassGate lpg;
+pt::LowPassGate lpg;
 dsp::SchmittTrigger trig;
 
 void onSampleRateChange(const SampleRateChangeEvent&amp; e) override { lpg.init(e.sampleRate); }
@@ -61,7 +61,7 @@ void process(const ProcessArgs&amp; args) override {
     float in = inputs[IN].getVoltage() / 5.f;
     float out;
     if (inputs[LEVEL].isConnected()) {
-        out = lpg.process(in, ml::clamp(inputs[LEVEL].getVoltage() / 10.f, 0.f, 1.f));
+        out = lpg.process(in, pt::clamp(inputs[LEVEL].getVoltage() / 10.f, 0.f, 1.f));
     } else {
         if (trig.process(inputs[TRIG].getVoltage())) lpg.trigger();
         out = lpg.process(in);
@@ -69,7 +69,7 @@ void process(const ProcessArgs&amp; args) override {
     outputs[OUT].setVoltage(5.f * out);
 }</code></pre>
 <pre><code>// After a voice (osc is any oscillator): tie the attack to the note, as Plaits does
-float hz = ml::voltToHz(inputs[VOCT].getVoltage());
+float hz = pt::voltToHz(inputs[VOCT].getVoltage());
 osc.setFrequency(hz);
 lpg.setAttackPitch(hz);
 if (trig.process(inputs[TRIG].getVoltage())) lpg.trigger();
@@ -77,7 +77,7 @@ outputs[OUT].setVoltage(5.f * lpg.process(osc.process()));</code></pre>
 
 <!-- ===================================================================== -->
 <h2 id="dynamics-vactrol">Vactrol</h2>
-<p class="origin"><code>#include "ml/dynamics/vactrol.h"</code> · from Streams</p>
+<p class="origin"><code>#include "pt/dynamics/vactrol.h"</code> · from Streams</p>
 <p>A detailed model of a vactrol (an LED shining on a light-dependent resistor), the part behind Buchla-style low-pass gates. Unlike <a href="#dynamics-lpg">LowPassGate</a>, it doesn't process audio. It turns a control signal into the <em>gain</em> and <em>cutoff</em> a real vactrol would give, and you wire those to your own VCA and filter.</p>
 <p><strong>What it models.</strong></p>
 <ul>
@@ -96,8 +96,8 @@ outputs[OUT].setVoltage(5.f * lpg.process(osc.process()));</code></pre>
 <tr><td><code>gain()</code>, <code>cutoff()</code></td><td>The latest gain, and the matching cutoff (0..1) to map onto your filter.</td></tr>
 </table>
 <pre><code>// A complete vactrol low-pass gate: Vactrol drives an Svf and a VCA
-ml::Vactrol vactrol;
-ml::Svf filter;
+pt::Vactrol vactrol;
+pt::Svf filter;
 // onSampleRateChange: vactrol.init(e.sampleRate); filter.init(e.sampleRate);
 
 vactrol.setDecay(0.05f + 2.f * params[DECAY].getValue());
@@ -110,7 +110,7 @@ outputs[OUT].setVoltage(5.f * gain * filter.process(in).lp);</code></pre>
 
 <!-- ===================================================================== -->
 <h2 id="dynamics-compressor">Compressor</h2>
-<p class="origin"><code>#include "ml/dynamics/compressor.h"</code> · from Streams</p>
+<p class="origin"><code>#include "pt/dynamics/compressor.h"</code> · from Streams</p>
 <p>A feed-forward compressor with optional sidechain, soft knee and makeup gain.</p>
 <p><strong>How it works.</strong></p>
 <ol>
@@ -128,7 +128,7 @@ outputs[OUT].setVoltage(5.f * gain * filter.process(in).lp);</code></pre>
 <tr><td><code>process(in)</code>, <code>process(in, sidechain)</code></td><td>Returns the compressed signal; the second form detects the level from another signal.</td></tr>
 <tr><td><code>gainReduction()</code></td><td>Current reduction in dB, for a meter.</td></tr>
 </table>
-<pre><code>ml::Compressor comp;   // onSampleRateChange: comp.init(e.sampleRate);
+<pre><code>pt::Compressor comp;   // onSampleRateChange: comp.init(e.sampleRate);
 
 comp.setThreshold(-30.f + 30.f * params[THRESHOLD].getValue());
 comp.setRatio(1.f + 19.f * params[RATIO].getValue());
@@ -144,7 +144,7 @@ lights[REDUCTION].setBrightness(comp.gainReduction() / 12.f);</code></pre>
 
 <!-- ===================================================================== -->
 <h2 id="dynamics-follower">Follower</h2>
-<p class="origin"><code>#include "ml/dynamics/follower.h"</code> · from Rings</p>
+<p class="origin"><code>#include "pt/dynamics/follower.h"</code> · from Rings</p>
 <p>An envelope follower that also tracks brightness. Feed it audio, and it outputs two smooth control signals: how loud the audio is, and how bright it is (its "spectral centroid"). Rings uses it so its FM voice follows the dynamics of the input.</p>
 <p><strong>How it works.</strong> Two filters split the input into low, mid and high bands (at about 160 Hz and 1.6 kHz). Each band has its own envelope detector, faster for higher bands. The envelope is their sum. The brightness is a weighted average of which band dominates, from 0 (all low) to 1 (all high), smoothed with a fast rise and a slow fall.</p>
 <table>
@@ -153,10 +153,10 @@ lights[REDUCTION].setBrightness(comp.gainReduction() / 12.f);</code></pre>
 <tr><td><code>process(in)</code></td><td>Returns the envelope (about 0..1 for a full-scale input).</td></tr>
 <tr><td><code>envelope()</code>, <code>centroid()</code></td><td>The latest envelope and brightness (0..1).</td></tr>
 </table>
-<pre><code>ml::Follower follower;   // onSampleRateChange: follower.init(e.sampleRate);
+<pre><code>pt::Follower follower;   // onSampleRateChange: follower.init(e.sampleRate);
 
 float env = follower.process(inputs[IN].getVoltage() / 5.f);
-outputs[ENVELOPE].setVoltage(10.f * ml::clamp(env, 0.f, 1.f));
+outputs[ENVELOPE].setVoltage(10.f * pt::clamp(env, 0.f, 1.f));
 outputs[BRIGHTNESS].setVoltage(10.f * follower.centroid());</code></pre>
 
 </main>

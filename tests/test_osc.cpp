@@ -6,18 +6,18 @@
 #include <cstdio>
 #include <vector>
 
-#include "ml/noise/clocked_noise.h"
-#include "ml/noise/dust.h"
-#include "ml/noise/particle.h"
-#include "ml/noise/smooth_random.h"
-#include "ml/osc/formant.h"
-#include "ml/osc/grainlet.h"
-#include "ml/osc/harmonic.h"
-#include "ml/osc/string_synth.h"
-#include "ml/osc/variable_shape.h"
-#include "ml/osc/vosim.h"
-#include "ml/osc/wavetable.h"
-#include "ml/osc/z_osc.h"
+#include "pt/noise/clocked_noise.h"
+#include "pt/noise/dust.h"
+#include "pt/noise/particle.h"
+#include "pt/noise/smooth_random.h"
+#include "pt/osc/formant.h"
+#include "pt/osc/grainlet.h"
+#include "pt/osc/harmonic.h"
+#include "pt/osc/string_synth.h"
+#include "pt/osc/variable_shape.h"
+#include "pt/osc/vosim.h"
+#include "pt/osc/wavetable.h"
+#include "pt/osc/z_osc.h"
 
 #include "test.h"
 #include "wav.h"
@@ -76,44 +76,44 @@ static float level(const std::vector<float>& x, float sr, float hz) {
 
 static void testOscillators() {
   for (float shape : {0.0f, 0.5f, 1.0f}) {
-    checkPitch<ml::VariableShapeOscillator>("variable_shape", 220.0f, 1.2f, [shape](ml::VariableShapeOscillator& o) {
+    checkPitch<pt::VariableShapeOscillator>("variable_shape", 220.0f, 1.2f, [shape](pt::VariableShapeOscillator& o) {
       o.setFrequency(220.0f);
       o.setShape(shape);
       o.setPulseWidth(0.3f);
     });
   }
   // Hard sync: the pitch is the master's, whatever the slave does.
-  checkPitch<ml::VariableShapeOscillator>("variable_sync", 110.0f, 1.2f, [](ml::VariableShapeOscillator& o) {
+  checkPitch<pt::VariableShapeOscillator>("variable_sync", 110.0f, 1.2f, [](pt::VariableShapeOscillator& o) {
     o.setSyncFrequency(110.0f);
     o.setFrequency(317.0f);
     o.setShape(0.5f);
   });
-  checkPitch<ml::FormantOscillator>("formant", 150.0f, 1.2f, [](ml::FormantOscillator& o) {
+  checkPitch<pt::FormantOscillator>("formant", 150.0f, 1.2f, [](pt::FormantOscillator& o) {
     o.setCarrierFrequency(150.0f);
     o.setFormantFrequency(1100.0f);
   });
-  checkPitch<ml::ZOscillator>("z_osc", 150.0f, 1.5f, [](ml::ZOscillator& o) {
+  checkPitch<pt::ZOscillator>("z_osc", 150.0f, 1.5f, [](pt::ZOscillator& o) {
     o.setCarrierFrequency(150.0f);
     o.setFormantFrequency(900.0f);
     o.setShape(0.3f);
     o.setMode(0.5f);
   });
-  checkPitch<ml::VosimOscillator>("vosim", 120.0f, 1.2f, [](ml::VosimOscillator& o) {
+  checkPitch<pt::VosimOscillator>("vosim", 120.0f, 1.2f, [](pt::VosimOscillator& o) {
     o.setCarrierFrequency(120.0f);
     o.setFormantFrequencies(700.0f, 1200.0f);
     o.setShape(0.5f);
   });
-  checkPitch<ml::GrainletOscillator>("grainlet", 150.0f, 1.2f, [](ml::GrainletOscillator& o) {
+  checkPitch<pt::GrainletOscillator>("grainlet", 150.0f, 1.2f, [](pt::GrainletOscillator& o) {
     o.setCarrierFrequency(150.0f);
     o.setFormantFrequency(800.0f);
     o.setShape(0.5f);
     o.setBleed(0.3f);
   });
-  checkPitch<ml::StringSynthOscillator>("string_synth", 110.0f, 1.5f, [](ml::StringSynthOscillator& o) {
+  checkPitch<pt::StringSynthOscillator>("string_synth", 110.0f, 1.5f, [](pt::StringSynthOscillator& o) {
     o.setFrequency(110.0f);
     o.setRegistration(0.3f);
   });
-  checkPitch<ml::HarmonicOscillator>("harmonic", 200.0f, 1.2f, [](ml::HarmonicOscillator& o) {
+  checkPitch<pt::HarmonicOscillator>("harmonic", 200.0f, 1.2f, [](pt::HarmonicOscillator& o) {
     o.setFrequency(200.0f);
     const float a[8] = {0.5f, 0.2f, 0.1f, 0.05f, 0.05f, 0.05f, 0.03f, 0.02f};
     o.setAmplitudes(a, 8);
@@ -121,7 +121,7 @@ static void testOscillators() {
 
   // Harmonic oscillator: only harmonic 3 set -> a pure tone at 3x.
   {
-    std::vector<float> out = render<ml::HarmonicOscillator>(48000.0f, 0.5f, [](ml::HarmonicOscillator& o) {
+    std::vector<float> out = render<pt::HarmonicOscillator>(48000.0f, 0.5f, [](pt::HarmonicOscillator& o) {
       o.setFrequency(200.0f);
       o.setAmplitude(1, 0.0f);
       o.setAmplitude(3, 1.0f);
@@ -134,7 +134,7 @@ static void testOscillators() {
   // 48 kHz has its 10th harmonic at 50 kHz, which a naive saw folds to
   // 2 kHz.
   {
-    std::vector<float> out = render<ml::VariableShapeOscillator>(48000.0f, 0.5f, [](ml::VariableShapeOscillator& o) {
+    std::vector<float> out = render<pt::VariableShapeOscillator>(48000.0f, 0.5f, [](pt::VariableShapeOscillator& o) {
       o.setFrequency(5000.0f);
       o.setShape(0.5f);
     });
@@ -153,7 +153,7 @@ static void testWavetable() {
     waves[n + i] = 2.0f * i / n - 1.0f;
   }
   for (float morph : {0.0f, 1.0f}) {
-    checkPitch<ml::WavetableOscillator>("wavetable", 220.0f, 1.5f, [&](ml::WavetableOscillator& o) {
+    checkPitch<pt::WavetableOscillator>("wavetable", 220.0f, 1.5f, [&](pt::WavetableOscillator& o) {
       o.loadWaves(waves.data(), n, 2);
       o.setFrequency(220.0f);
       o.setMorph(morph);
@@ -162,7 +162,7 @@ static void testWavetable() {
   // Morph 0 is the sine: almost no second harmonic. Morph 1 is the saw:
   // second harmonic at about half the fundamental.
   for (float morph : {0.0f, 1.0f}) {
-    std::vector<float> out = render<ml::WavetableOscillator>(48000.0f, 0.5f, [&](ml::WavetableOscillator& o) {
+    std::vector<float> out = render<pt::WavetableOscillator>(48000.0f, 0.5f, [&](pt::WavetableOscillator& o) {
       o.loadWaves(waves.data(), n, 2);
       o.setFrequency(220.0f);
       o.setMorph(morph);
@@ -180,7 +180,7 @@ static void testWavetable() {
     if (phase >= 1.0f) phase -= 1.0f;
     x = waves[n + static_cast<int>(phase * n)];
   }
-  good = render<ml::WavetableOscillator>(48000.0f, 0.5f, [&](ml::WavetableOscillator& o) {
+  good = render<pt::WavetableOscillator>(48000.0f, 0.5f, [&](pt::WavetableOscillator& o) {
     o.loadWaves(waves.data(), n, 2);
     o.setFrequency(5000.0f);
     o.setMorph(1.0f);
@@ -193,7 +193,7 @@ static void testWavetable() {
 static void testNoise() {
   for (float sr : kRates) {
     // Dust: about `density` impulses per second.
-    ml::Dust d;
+    pt::Dust d;
     d.init(sr);
     d.setDensity(500.0f);
     int count = 0;
@@ -205,7 +205,7 @@ static void testNoise() {
     CHECK_NEAR(count / 4.0f, 500.0f, 30.0f);
 
     // Clocked noise at 100 Hz: about 100 new values per second.
-    ml::ClockedNoise c;
+    pt::ClockedNoise c;
     c.init(sr);
     c.setFrequency(100.0f);
     std::vector<float> cn(static_cast<size_t>(sr * 2));
@@ -219,7 +219,7 @@ static void testNoise() {
     CHECK_NEAR(steps / 2.0f, 100.0f, 5.0f);
 
     // Smooth random: within ±1, and continuous (small steps per sample).
-    ml::SmoothRandom s;
+    pt::SmoothRandom s;
     s.init(sr);
     s.setFrequency(10.0f);
     float previous = s.process(), maxStep = 0.0f;
@@ -232,7 +232,7 @@ static void testNoise() {
     CHECK(maxStep < 2.0f * 1.5f * 10.0f / sr + 1e-4f);
 
     // Particle: bounded, makes a sound.
-    ml::Particle p;
+    pt::Particle p;
     p.init(sr);
     p.setDensity(200.0f);
     p.setFrequency(1000.0f);

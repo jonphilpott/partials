@@ -1,10 +1,10 @@
-// mutablelib — tests/test.h
+// partials — tests/test.h
 //
 // The whole test "framework": a CHECK macro that reports the failing line
 // and counts failures, and helpers for the checks every component gets.
 
-#ifndef ML_TESTS_TEST_H_
-#define ML_TESTS_TEST_H_
+#ifndef PT_TESTS_TEST_H_
+#define PT_TESTS_TEST_H_
 
 #include <cmath>
 #include <cstdio>
@@ -78,4 +78,4 @@ inline int testResult(const char* name) {
   return failureCount() ? 1 : 0;
 }
 
-#endif  // ML_TESTS_TEST_H_
+#endif  // PT_TESTS_TEST_H_
