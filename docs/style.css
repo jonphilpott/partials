@@ -1,0 +1,62 @@
+/* mutablelib docs. One stylesheet, no scripts. */
+
+:root {
+  --bg: #fbfaf7;
+  --fg: #1d1d1b;
+  --muted: #6b6a66;
+  --rule: #e2dfd8;
+  --code-bg: #f1eee7;
+  --accent: #b2452c;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161614;
+    --fg: #e8e6e1;
+    --muted: #9a978f;
+    --rule: #2e2d2a;
+    --code-bg: #22211e;
+    --accent: #e0805f;
+  }
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.6 -apple-system, "Segoe UI", system-ui, sans-serif;
+}
+.page { display: flex; max-width: 1100px; margin: 0 auto; }
+nav {
+  flex: 0 0 200px;
+  padding: 32px 16px;
+  position: sticky; top: 0; align-self: flex-start;
+  font-size: 14px;
+}
+nav a { display: block; padding: 3px 0; color: var(--muted); text-decoration: none; }
+nav a:hover, nav a.here { color: var(--fg); }
+nav .title { font-weight: 700; color: var(--fg); margin-bottom: 12px; }
+main { flex: 1; min-width: 0; padding: 32px 16px 96px; max-width: 760px; }
+
+h1 { font-size: 32px; line-height: 1.2; margin: 0 0 8px; }
+h2 { font-size: 22px; margin: 48px 0 8px; padding-top: 16px; border-top: 1px solid var(--rule); }
+h3 { font-size: 17px; margin: 28px 0 4px; }
+.lede { color: var(--muted); font-size: 18px; margin-top: 0; }
+a { color: var(--accent); }
+
+code { font-family: var(--mono); font-size: 0.9em; background: var(--code-bg); padding: 1px 4px; border-radius: 3px; }
+pre { background: var(--code-bg); padding: 14px 16px; border-radius: 6px; overflow-x: auto; line-height: 1.45; }
+pre code { background: none; padding: 0; }
+
+table { border-collapse: collapse; width: 100%; font-size: 14px; margin: 12px 0; }
+th, td { text-align: left; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; }
+
+.origin { color: var(--muted); font-size: 14px; margin-top: -4px; }
+
+@media (max-width: 720px) {
+  .page { display: block; }
+  nav { position: static; padding-bottom: 0; }
+  nav a { display: inline-block; margin-right: 12px; }
+}

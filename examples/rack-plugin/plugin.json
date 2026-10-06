@@ -1,0 +1,66 @@
+{
+  "slug": "MutablelibDemo",
+  "name": "mutablelib demo",
+  "version": "2.0.0",
+  "license": "MIT",
+  "brand": "mutablelib",
+  "author": "Jon Philpott",
+  "modules": [
+    {
+      "slug": "Strike",
+      "name": "Strike",
+      "description": "Plucker into a modal resonator into a low-pass gate, built from mutablelib",
+      "tags": [
+        "Physical Modeling",
+        "Voice"
+      ]
+    },
+    {
+      "slug": "Haze",
+      "name": "Haze",
+      "description": "Effects chain built from mutablelib: overdrive, ensemble, diffuser, reverb, limiter",
+      "tags": [
+        "Effect",
+        "Reverb",
+        "Chorus",
+        "Distortion"
+      ]
+    },
+    {
+      "slug": "Kit",
+      "name": "Kit",
+      "description": "808-style kick, snare and hi-hat built from mutablelib's drums",
+      "tags": [
+        "Drum"
+      ]
+    },
+    {
+      "slug": "Drift",
+      "name": "Drift",
+      "description": "Clocked random voltages with deja vu, glide and quantizing, built from mutablelib",
+      "tags": [
+        "Random",
+        "Quantizer",
+        "Envelope Generator"
+      ]
+    },
+    {
+      "slug": "Palette",
+      "name": "Palette",
+      "description": "Six of Plaits' oscillators as one voice, built from mutablelib",
+      "tags": [
+        "VCO"
+      ]
+    },
+    {
+      "slug": "Bridge",
+      "name": "Bridge",
+      "description": "Cross-modulation, frequency shifting and vocoding of two inputs, built from mutablelib",
+      "tags": [
+        "Ring Modulator",
+        "Frequency Shifter",
+        "Vocoder"
+      ]
+    }
+  ]
+}

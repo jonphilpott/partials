@@ -1,0 +1,26 @@
+{
+  "slug": "MyFirstPlugin",
+  "name": "My First Plugin",
+  "version": "2.0.0",
+  "license": "MIT",
+  "brand": "MyBrand",
+  "author": "Your Name",
+  "authorEmail": "",
+  "authorUrl": "",
+  "pluginUrl": "",
+  "manualUrl": "",
+  "sourceUrl": "",
+  "donateUrl": "",
+  "changelogUrl": "",
+  "modules": [
+    {
+      "slug": "SawFilter",
+      "name": "Saw Filter",
+      "description": "A sawtooth oscillator into a low-pass filter",
+      "tags": [
+        "Oscillator",
+        "Filter"
+      ]
+    }
+  ]
+}

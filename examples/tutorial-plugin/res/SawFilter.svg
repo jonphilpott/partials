@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     width="30.48mm" height="128.5mm" viewBox="0 0 30.48 128.5">
+  <!-- The panel: 6 HP wide (6 x 5.08 mm) and 128.5 mm tall, the Eurorack size. -->
+  <rect width="30.48" height="128.5" fill="#e6e4dc"/>
+  <rect width="30.48" height="12" fill="#2b2b2b"/>
+  <rect x="4" y="98" width="22.48" height="20" rx="2" fill="#2b2b2b"/>
+
+  <!-- Where the knobs and jack go. Rack's helper reads this layer to write
+       the C++ code; it is hidden, so Rack doesn't draw it.
+       Red = knob (param), green = input, blue = output. -->
+  <g id="components" inkscape:label="components" inkscape:groupmode="layer" style="display:none">
+    <circle id="FREQ" cx="15.24" cy="38" r="4" fill="#ff0000"/>
+    <circle id="CUTOFF" cx="15.24" cy="68" r="4" fill="#ff0000"/>
+    <circle id="OUT" cx="15.24" cy="108" r="4" fill="#0000ff"/>
+  </g>
+</svg>

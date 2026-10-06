@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drums · mutablelib</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="page">
+<nav>
+  <div class="title">mutablelib</div>
+  <a href="index.html">Overview</a>
+  <a href="setup.html">Getting started</a>
+  <a href="tutorial.html">Tutorial</a>
+  <a href="core.html">Core</a>
+  <a href="physical.html">Physical models</a>
+  <a href="dynamics.html">Dynamics</a>
+  <a href="fx.html">Effects</a>
+  <a href="drums.html" class="here">Drums</a>
+  <a href="mod.html">Modulation</a>
+  <a href="osc.html">Oscillators</a>
+  <a href="noise.html">Noise</a>
+  <a href="spectral.html">Spectral</a>
+  <a href="plumbing.html">Plumbing</a>
+</nav>
+<main>
+
+<h1>Drums</h1>
+<p class="lede">Plaits' 808- and 909-style drum voices and Peaks' FM drum, as single-voice components.</p>
+
+<p>Every drum works the same way:</p>
+<ul>
+  <li><code>init(sampleRate)</code>, then setters (all 0..1, except frequency in Hz).</li>
+  <li><code>setAccent(x)</code>, then <code>trigger()</code> on each hit.</li>
+  <li><code>process()</code> on every sample. It returns about ±1 at full accent, louder for some settings.</li>
+  <li><code>setSustain(true)</code> plays a continuous tone instead of hits. Plaits does this when nothing is patched to its trigger input, and it makes the drums usable as oscillators.</li>
+</ul>
+<p>The pattern for a trigger input:</p>
+<pre><code>dsp::SchmittTrigger trig;   // member
+
+if (trig.process(inputs[TRIG].getVoltage(), 0.1f, 1.f)) {
+    drum.setAccent(inputs[ACCENT].getVoltage() / 10.f);   // 0..10 V accent CV
+    drum.trigger();
+}
+outputs[OUT].setVoltage(5.f * drum.process());</code></pre>
+<p>Settings take effect at once, including in the middle of a ringing hit, so you can modulate them with CVs.</p>
+
+<!-- ===================================================================== -->
+<h2 id="drums-analog_kick">AnalogKick</h2>
+<p class="origin"><code>#include "ml/drums/analog_kick.h"</code> · from Plaits (analog bass drum)</p>
+<p>A circuit model of the TR-808 bass drum. A trigger pulse strikes a resonant filter tuned to the drum's pitch, and the filter's ringing is the drum. A second pulse briefly raises the pitch (the 808's attack "knock"), and the drum can push its own pitch up with its level (self-FM) for a punchy downward sweep. Plaits adds the self-FM and the tone and decay ranges beyond the original 808.</p>
+<table>
+<tr><th>Setter</th><th>Effect</th></tr>
+<tr><td><code>setFrequency(hz)</code></td><td>Pitch. 808 kicks sit around 40–60 Hz; toms go higher.</td></tr>
+<tr><td><code>setTone(x)</code></td><td>Brightness, and how much click leaks through.</td></tr>
+<tr><td><code>setDecay(x)</code></td><td>Ring time, from a short thud to a long boom.</td></tr>
+<tr><td><code>setAttackFm(x)</code></td><td>Pitch knock at the attack.</td></tr>
+<tr><td><code>setSelfFm(x)</code></td><td>Pitch follows level: punchier, with a pitch drop.</td></tr>
+<tr><td><code>setAccent(x)</code>, <code>setSustain(on)</code></td><td>As above.</td></tr>
+</table>
+<pre><code>ml::AnalogKick kick;
+dsp::SchmittTrigger trig;
+
+void onSampleRateChange(const SampleRateChangeEvent&amp; e) override { kick.init(e.sampleRate); }
+
+void process(const ProcessArgs&amp; args) override {
+    kick.setFrequency(ml::voltToHz(inputs[VOCT].getVoltage() - 2.f));   // 0 V = C2 (65 Hz)
+    kick.setTone(params[TONE].getValue());
+    kick.setDecay(params[DECAY].getValue());
+    kick.setAttackFm(params[PUNCH].getValue());
+    kick.setSelfFm(params[PUNCH].getValue() * 0.5f);
+    if (trig.process(inputs[TRIG].getVoltage(), 0.1f, 1.f)) kick.trigger();
+    outputs[OUT].setVoltage(5.f * kick.process());
+}</code></pre>
+
+<!-- ===================================================================== -->
+<h2 id="drums-analog_snare">AnalogSnare</h2>
+<p class="origin"><code>#include "ml/drums/analog_snare.h"</code> · from Plaits (analog snare drum)</p>
+<p>A circuit model of the TR-808 snare, extended:</p>
+<ul>
+  <li><strong>Shell:</strong> resonant filters ("modes") struck by a pulse. The 808 has two; above two-thirds of the <code>tone</code> range, three more inharmonic modes fade in.</li>
+  <li><strong>Snares:</strong> rectified noise through a band-pass, with its own envelope.</li>
+  <li><code>snappy</code> balances the two.</li>
+</ul>
+<table>
+<tr><th>Setter</th><th>Effect</th></tr>
+<tr><td><code>setFrequency(hz)</code></td><td>Shell pitch, around 150–250 Hz.</td></tr>
+<tr><td><code>setTone(x)</code></td><td>Below 2/3, the 808's two modes from round to bright. Above, extra metallic modes.</td></tr>
+<tr><td><code>setDecay(x)</code></td><td>Ring time of shell and snares.</td></tr>
+<tr><td><code>setSnappy(x)</code></td><td>0 is all shell (a tom-like knock), 1 all snares (noise).</td></tr>
+<tr><td><code>setAccent(x)</code>, <code>setSustain(on)</code>, <code>seed(s)</code></td><td>As above; <code>seed</code> repeats the noise exactly.</td></tr>
+</table>
+<pre><code>snare.setFrequency(180.f * ml::semitonesToRatio(params[TUNE].getValue() * 12.f));   // ±1 octave
+snare.setTone(params[TONE].getValue());
+snare.setDecay(params[DECAY].getValue());
+snare.setSnappy(params[SNAPPY].getValue());
+if (trig.process(inputs[TRIG].getVoltage(), 0.1f, 1.f)) snare.trigger();
+outputs[OUT].setVoltage(5.f * snare.process());</code></pre>
+
+<!-- ===================================================================== -->
+<h2 id="drums-synth_kick">SynthKick</h2>
+<p class="origin"><code>#include "ml/drums/synth_kick.h"</code> · from Plaits (synthetic bass drum)</p>
+<p>A digital kick in the style of the TR-909 and its imitators:</p>
+<ul>
+  <li>The body is an oscillator whose waveform morphs from a clean sine to a jittery, soft-clipped triangle (<code>dirtiness</code>).</li>
+  <li>A fast pitch envelope gives the punchy start.</li>
+  <li>A model of a transistor VCA shapes the level.</li>
+  <li>A click plus filtered noise make the transient.</li>
+</ul>
+<table>
+<tr><th>Setter</th><th>Effect</th></tr>
+<tr><td><code>setFrequency(hz)</code></td><td>Pitch.</td></tr>
+<tr><td><code>setTone(x)</code></td><td>Brightness, and the level of the click and noise transient.</td></tr>
+<tr><td><code>setDecay(x)</code></td><td>Body decay.</td></tr>
+<tr><td><code>setDirtiness(x)</code></td><td>Clean sine (0) to a gritty triangle (1). Fades out at high pitches.</td></tr>
+<tr><td><code>setFmAmount(x)</code>, <code>setFmDecay(x)</code></td><td>Depth and length of the initial pitch drop.</td></tr>
+<tr><td><code>setAccent(x)</code>, <code>setSustain(on)</code>, <code>seed(s)</code></td><td>As above.</td></tr>
+</table>
+<pre><code>// A 909-ish kick with one "punch" knob driving the pitch envelope
+float punch = params[PUNCH].getValue();
+kick.setFrequency(50.f);
+kick.setFmAmount(punch);
+kick.setFmDecay(0.2f + 0.3f * punch);
+kick.setDecay(params[DECAY].getValue());
+kick.setDirtiness(params[GRIT].getValue());
+kick.setTone(0.3f);
+if (trig.process(inputs[TRIG].getVoltage(), 0.1f, 1.f)) kick.trigger();
+outputs[OUT].setVoltage(5.f * kick.process());</code></pre>
+
+<!-- ===================================================================== -->
+<h2 id="drums-synth_snare">SynthSnare</h2>
+<p class="origin"><code>#include "ml/drums/synth_snare.h"</code> · from Plaits (synthetic snare drum)</p>
+<p>A model of the TR-909 snare:</p>
+<ul>
+  <li><strong>Drum:</strong> two soft-clipped triangle oscillators with a pitch drop at the start. The 909's quirk of the oscillators slightly resetting each other is kept; it gives grit at high FM and low pitch.</li>
+  <li><strong>Snares:</strong> band-passed noise, with an envelope that holds for 40–70 ms before decaying. The hold is the 909's body.</li>
+</ul>
+<table>
+<tr><th>Setter</th><th>Effect</th></tr>
+<tr><td><code>setFrequency(hz)</code></td><td>Drum pitch, around 150–250 Hz.</td></tr>
+<tr><td><code>setFmAmount(x)</code></td><td>Pitch drop at the attack.</td></tr>
+<tr><td><code>setDecay(x)</code></td><td>Decay of drum and snares.</td></tr>
+<tr><td><code>setSnappy(x)</code></td><td>Drum (0) to snares (1), equal-power.</td></tr>
+<tr><td><code>setAccent(x)</code>, <code>setSustain(on)</code>, <code>seed(s)</code></td><td>As above.</td></tr>
+</table>
+<pre><code>snare.setFrequency(ml::voltToHz(params[TUNE].getValue() - 1.f));   // around C3
+snare.setFmAmount(params[FM].getValue());
+snare.setDecay(params[DECAY].getValue());
+snare.setSnappy(params[SNAPPY].getValue());
+if (trig.process(inputs[TRIG].getVoltage(), 0.1f, 1.f)) snare.trigger();
+outputs[OUT].setVoltage(5.f * snare.process());</code></pre>
+
+<!-- ===================================================================== -->
+<h2 id="drums-hihat">HiHat</h2>
+<p class="origin"><code>#include "ml/drums/hihat.h"</code> · from Plaits (hi-hat engine)</p>
+<p>A TR-808 hi-hat and a ring-modulated variant, chosen in <code>init()</code>:</p>
+<ul>
+  <li><code>HiHat::SQUARE_808</code>: six square waves at the 808's inharmonic ratios, through the 808's lopsided VCA. The classic tick and sizzle.</li>
+  <li><code>HiHat::RING_MOD</code>: three ring-modulated oscillator pairs, through a clean VCA with a two-stage decay (an open hat that chokes into a short tail). Harsher and more electronic.</li>
+</ul>
+<p>Both are coloured by a band-pass and end with a high-pass. <code>noisiness</code> blends in plain clocked noise for washier, cymbal-like sounds.</p>
+<table>
+<tr><th>Call</th><th>Effect</th></tr>
+<tr><td><code>init(sampleRate, model)</code></td><td>Model as above. Default <code>SQUARE_808</code>.</td></tr>
+<tr><td><code>setFrequency(hz)</code></td><td>Base pitch of the metallic oscillators; about 400 Hz is the 808.</td></tr>
+<tr><td><code>setTone(x)</code></td><td>Filter colour, from dark to sizzling.</td></tr>
+<tr><td><code>setDecay(x)</code></td><td>Closed (short) to open (long).</td></tr>
+<tr><td><code>setNoisiness(x)</code></td><td>Metallic (0) to plain noise (1).</td></tr>
+<tr><td><code>setAccent(x)</code>, <code>setSustain(on)</code>, <code>seed(s)</code></td><td>As above.</td></tr>
+</table>
+<pre><code>// Closed and open hats from one voice: the open trigger uses a longer decay
+ml::HiHat hat;   // onSampleRateChange: hat.init(e.sampleRate, ml::HiHat::SQUARE_808);
+dsp::SchmittTrigger closedTrig, openTrig;
+
+hat.setTone(params[TONE].getValue());
+if (closedTrig.process(inputs[CLOSED].getVoltage(), 0.1f, 1.f)) {
+    hat.setDecay(0.2f);
+    hat.trigger();
+}
+if (openTrig.process(inputs[OPEN].getVoltage(), 0.1f, 1.f)) {
+    hat.setDecay(0.75f);
+    hat.trigger();
+}
+outputs[OUT].setVoltage(5.f * hat.process());</code></pre>
+
+<!-- ===================================================================== -->
+<h2 id="drums-fm_drum">FmDrum</h2>
+<p class="origin"><code>#include "ml/drums/fm_drum.h"</code> · from Peaks</p>
+<p>A sine-wave drum with pitch envelopes, noise and overdrive. One voice covers kicks, toms, zaps and noisy snares. Its <code>morph(x, y)</code> control sweeps through Gillet's presets on an X/Y pad, which is how Peaks' two-knob mode works.</p>
+<p><strong>How it works.</strong> A sine is swept down in pitch by an FM envelope and by a short fixed "thump" envelope, which adds weight to low notes. The output also feeds back slightly into the pitch. An exponential amplitude envelope shapes the hit. The <code>noise</code> control mixes in white noise above 0.5 and applies tanh overdrive below it. Peaks did all this in 16-bit fixed point; this port is float throughout.</p>
+<table>
+<tr><th>Call</th><th>Effect</th></tr>
+<tr><td><code>setFrequency(hz)</code></td><td>Pitch, about 33 Hz to 1 kHz.</td></tr>
+<tr><td><code>setFmAmount(x)</code></td><td>Depth of the pitch sweep (up to 96 semitones).</td></tr>
+<tr><td><code>setDecay(x)</code></td><td>Length of the amplitude and pitch envelopes.</td></tr>
+<tr><td><code>setNoise(x)</code></td><td>Below 0.5 overdrive (most at 0); above 0.5 noise (most at 1); 0.5 is clean.</td></tr>
+<tr><td><code>morph(x, y, snare)</code></td><td>Sets all four from Peaks' presets: <code>snare = false</code> for kicks and toms, <code>true</code> for snares and zaps.</td></tr>
+<tr><td><code>trigger()</code>, <code>seed(s)</code></td><td>As above. FmDrum has no accent or sustain mode.</td></tr>
+</table>
+<pre><code>// Peaks-style two-knob drum: X/Y morph, a switch for kick or snare presets
+fm.morph(params[X].getValue(), params[Y].getValue(), params[SNARE_MODE].getValue() &gt; 0.5f);
+if (trig.process(inputs[TRIG].getVoltage(), 0.1f, 1.f)) fm.trigger();
+outputs[OUT].setVoltage(5.f * fm.process());</code></pre>
+<pre><code>// Or set it directly: a zappy tom
+fm.setFrequency(110.f);
+fm.setFmAmount(0.6f);
+fm.setDecay(0.4f);
+fm.setNoise(0.3f);   // a little overdrive</code></pre>
+
+</main>
+</div>
+</body>
+</html>

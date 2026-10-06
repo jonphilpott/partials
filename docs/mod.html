@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modulation · mutablelib</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="page">
+<nav>
+  <div class="title">mutablelib</div>
+  <a href="index.html">Overview</a>
+  <a href="setup.html">Getting started</a>
+  <a href="tutorial.html">Tutorial</a>
+  <a href="core.html">Core</a>
+  <a href="physical.html">Physical models</a>
+  <a href="dynamics.html">Dynamics</a>
+  <a href="fx.html">Effects</a>
+  <a href="drums.html">Drums</a>
+  <a href="mod.html" class="here">Modulation</a>
+  <a href="osc.html">Oscillators</a>
+  <a href="noise.html">Noise</a>
+  <a href="spectral.html">Spectral</a>
+  <a href="plumbing.html">Plumbing</a>
+</nav>
+<main>
+
+<h1>Modulation</h1>
+<p class="lede">Envelopes, function generators, clocks, chaos and controlled randomness, from Peaks, Tides, Streams and Marbles.</p>
+<p>These produce control signals. Outputs are 0..1 (unipolar) or ±1 (bipolar), as each section says. Multiply by 10 V or 5 V for Rack.</p>
+
+<!-- ===================================================================== -->
+<h2 id="mod-envelope">Envelope</h2>
+<p class="origin"><code>#include "ml/mod/envelope.h"</code> · from Peaks</p>
+<p>A multi-segment envelope with ADSR, AD, AR and looping presets, or fully custom segments with their own levels, times and curves.</p>
+<p><strong>How it works.</strong> Segment <em>i</em> ramps from level <em>i</em> to level <em>i</em>+1 over its time, along a curve: linear, exponential (fast then slow) or quartic (slow then fast).</p>
+<ul>
+  <li><strong>Retrigger:</strong> a rising gate restarts from the current level, so there's no click (or from 0, with hard reset).</li>
+  <li><strong>Sustain:</strong> the envelope holds at the sustain point while the gate is high, and a falling gate jumps to it.</li>
+  <li><strong>Loop:</strong> a loop cycles through segments, like an LFO with any shape.</li>
+</ul>
+<table>
+<tr><th>Call</th><th>Effect</th></tr>
+<tr><td><code>setAdsr(a, d, s, r)</code></td><td>Times in seconds, sustain 0..1. Quartic attack, exponential decay and release (Peaks' choice).</td></tr>
+<tr><td><code>setAd(a, d)</code>, <code>setAr(a, r)</code>, <code>setAdr(a, d, s, r)</code></td><td>AD ignores the gate length; AR holds at the top while the gate is high.</td></tr>
+<tr><td><code>setAdLoop(a, d)</code>, <code>setAdrLoop(a, d, s, r)</code></td><td>Looping versions: they cycle while running.</td></tr>
+<tr><td><code>setLevel(i, x)</code>, <code>setTime(i, s)</code>, <code>setShape(i, shape)</code></td><td>Custom segments: <code>Envelope::LINEAR</code>, <code>EXPONENTIAL</code> or <code>QUARTIC</code>.</td></tr>
+<tr><td><code>setNumSegments(n)</code>, <code>setSustainPoint(i)</code>, <code>setLoop(start, end)</code></td><td>Up to 6 segments; sustain point 0 means none; loop end 0 means no loop.</td></tr>
+<tr><td><code>setHardReset(on)</code></td><td>Every trigger restarts from level 0.</td></tr>
+<tr><td><code>process(gate)</code></td><td>Returns 0..1. <code>active()</code> is false once it has finished.</td></tr>
+</table>
+<pre><code>ml::Envelope env;   // onSampleRateChange: env.init(e.sampleRate);
+
+// ADSR with knobs mapped to useful time ranges
+auto time = [](float k) { return 0.001f * std::pow(5000.f, k); };   // 1 ms to 5 s
+env.setAdsr(time(params[A].getValue()), time(params[D].getValue()),
+            params[S].getValue(), time(params[R].getValue()));
+bool gate = inputs[GATE].getVoltage() &gt;= 1.f;
+outputs[ENV].setVoltage(10.f * env.process(gate));</code></pre>
+<pre><code>// A custom 4-segment envelope: pluck, dip, swell, release
+env.setNumSegments(4);
+env.setLevel(0, 0.f);  env.setLevel(1, 1.f);  env.setLevel(2, 0.3f);
+env.setLevel(3, 0.8f); env.setLevel(4, 0.f);
+env.setTime(0, 0.005f); env.setShape(0, ml::Envelope::LINEAR);
+env.setTime(1, 0.2f);   env.setShape(1, ml::Envelope::EXPONENTIAL);
+env.setTime(2, 1.0f);   env.setShape(2, ml::Envelope::QUARTIC);
+env.setTime(3, 0.5f);   env.setShape(3, ml::Envelope::EXPONENTIAL);
+env.setSustainPoint(3);   // hold the swell's peak while the gate is high
+env.setLoop(0, 0);</code></pre>
+
+<!-- ===================================================================== -->
+<h2 id="mod-slope">Slope</h2>
+<p class="origin"><code>#include "ml/mod/slope.h"</code> · from Tides (2018)</p>
+<p>A function generator: the single-channel core of Tides. It is an envelope, a looping LFO or an audio oscillator, with a skewable and shapeable waveform and end-of-attack and end-of-release gates.</p>
+<p><strong>How it works.</strong></p>
+<ol>
+  <li>A ramp runs at the set frequency: once per trigger (<code>AD</code>), continuously (<code>LOOPING</code>), or up while the gate is held and down when released (<code>AR</code>).</li>
+  <li><code>slope</code> splits it into a rise and a fall of different lengths.</li>
+  <li><code>shape</code> bends both through a family of curves: logarithmic, sine, linear, exponential.</li>
+  <li><code>smoothness</code> below 0.5 low-passes the result; above 0.5 it wavefolds it.</li>
+  <li>In the <code>AUDIO</code> range the looping waveform is anti-aliased.</li>
+</ol>
+<p>Tides' four-output modes aren't included; build them from several Slopes.</p>
+<table>
+<tr><th>Call</th><th>Effect</th></tr>
+<tr><td><code>setMode(m)</code></td><td><code>Slope::AD</code>, <code>LOOPING</code> or <code>AR</code>.</td></tr>
+<tr><td><code>setRange(r)</code></td><td><code>Slope::CONTROL</code> (envelopes and LFOs) or <code>AUDIO</code> (anti-aliased oscillator, looping only).</td></tr>
+<tr><td><code>setFrequency(hz)</code></td><td>Cycle rate; in AD, one rise plus fall lasts 1/hz.</td></tr>
+<tr><td><code>setSlope(x)</code></td><td>0: instant rise, slow fall. 0.5: symmetric. 1: slow rise, instant fall.</td></tr>
+<tr><td><code>setShape(x)</code></td><td>Curve family; 0.5 is roughly linear.</td></tr>
+<tr><td><code>setSmoothness(x)</code></td><td>Below 0.5 smoother, above 0.5 folded.</td></tr>
+<tr><td><code>process(gate)</code></td><td>Returns 0..1 (AD, AR) or ±1 (LOOPING). The gate triggers AD, holds AR, and resets LOOPING.</td></tr>
+<tr><td><code>endOfAttack()</code>, <code>endOfRelease()</code></td><td>Gates for chaining and clocking.</td></tr>
+</table>
+<pre><code>// Tides-style function generator: mode switch, four knobs, EOA/EOR gates
+ml::Slope slope;   // onSampleRateChange: slope.init(e.sampleRate);
+
+slope.setMode(static_cast&lt;ml::Slope::Mode&gt;(int(params[MODE].getValue())));
+slope.setFrequency(0.1f * std::pow(1000.f, params[FREQ].getValue()));   // 0.1 to 100 Hz
+slope.setSlope(params[SLOPE].getValue());
+slope.setShape(params[SHAPE].getValue());
+slope.setSmoothness(params[SMOOTH].getValue());
+float v = slope.process(inputs[TRIG].getVoltage() &gt;= 1.f);
+bool looping = int(params[MODE].getValue()) == ml::Slope::LOOPING;
+outputs[OUT].setVoltage(looping ? 5.f * v : 8.f * v);   // Tides' levels: ±5 V or 0..8 V
+outputs[EOA].setVoltage(slope.endOfAttack() ? 10.f : 0.f);
+outputs[EOR].setVoltage(slope.endOfRelease() ? 10.f : 0.f);</code></pre>
+<pre><code>// As an audio oscillator
+osc.setMode(ml::Slope::LOOPING);
+osc.setRange(ml::Slope::AUDIO);
+osc.setFrequency(ml::voltToHz(inputs[VOCT].getVoltage()));
+outputs[AUDIO].setVoltage(5.f * osc.process(false));</code></pre>
+
+<!-- ===================================================================== -->
+<h2 id="mod-clock_to_ramp">ClockToRamp</h2>
+<p class="origin"><code>#include "ml/mod/clock_to_ramp.h"</code> · from Tides (2018)</p>
+<p>Turns a clock into a smooth phase ramp (0..1 per period), optionally multiplied or divided. It is how Tides and Marbles lock to an external clock. Use the ramp to drive anything that must stay in time: a Slope, a Lag, a wavetable, a sequencer's step position.</p>
+<p><strong>How it works.</strong></p>
+<ul>
+  <li>Each clock period is measured and the next one predicted. The predictor compares "same as last time" with "same as N pulses ago" (N up to 8) and uses whichever has been most accurate, so swung and patterned clocks are followed too.</li>
+  <li>The ramp runs at the predicted speed and is corrected at each pulse.</li>
+  <li>With a steady pulse width, the falling edge serves as an extra timing point.</li>
+  <li>After about 3 s without a pulse it starts again.</li>
+</ul>
+<table>
+<tr><th>Call</th><th>Effect</th></tr>
+<tr><td><code>init(sampleRate, maxHz = 40)</code></td><td>Clocks above <code>maxHz</code> are followed directly, without prediction.</td></tr>
+<tr><td><code>setRatio(multiply, divide)</code></td><td>Output rate = clock × multiply / divide; it realigns every <code>divide</code> pulses.</td></tr>
+<tr><td><code>process(clock)</code></td><td>The clock as a gate. Returns the ramp.</td></tr>
+<tr><td><code>frequency()</code>, <code>reset()</code></td><td>The output rate in Hz; start over.</td></tr>
+</table>
+<pre><code>// A clock-synced LFO: ramp into a sine, x2 or /2 by switch
+ml::ClockToRamp clock;   // onSampleRateChange: clock.init(e.sampleRate);
+
+int mode = int(params[RATIO].getValue());   // 0: /2, 1: x1, 2: x2
+clock.setRatio(mode == 2 ? 2 : 1, mode == 0 ? 2 : 1);
+float ramp = clock.process(inputs[CLOCK].getVoltage() &gt;= 1.f);
+outputs[RAMP].setVoltage(10.f * ramp);
+outputs[SINE].setVoltage(5.f * ml::sineFromPhase(ramp));</code></pre>
+
+<!-- ===================================================================== -->
+<h2 id="mod-bouncing_ball">BouncingBall</h2>
+<p class="origin"><code>#include "ml/mod/bouncing_ball.h"</code> · from Peaks</p>
+<p>An envelope that falls like a dropped ball, bouncing lower and faster until it comes to rest. Use it for accelerating ratchets, bouncing modulation, or a lively decaying envelope.</p>
+<p><strong>How it works.</strong> A small physics simulation, one step per sample. Gravity changes the velocity, the velocity moves the position, and at the floor the velocity reverses, multiplied by the elasticity. Peaks used fixed point; this port works in seconds.</p>
+<table>
+<tr><th>Call</th><th>Effect</th></tr>
+<tr><td><code>setGravity(x)</code></td><td>0..1. How fast it falls: from about 0.4 s to fall the full height, up to audio-rate buzzing.</td></tr>
+<tr><td><code>setBounce(x)</code></td><td>0..1. Elasticity: 0 stops dead, 1 bounces almost forever.</td></tr>
+<tr><td><code>setHeight(x)</code>, <code>setVelocity(x)</code></td><td>Drop height 0..1; initial velocity −1..1 (positive throws it up first).</td></tr>
+<tr><td><code>trigger()</code>, <code>process(gate)</code></td><td>Drop it; a rising gate also drops it. Returns the height, 0..1.</td></tr>
+</table>
+<pre><code>ml::BouncingBall ball;   // onSampleRateChange: ball.init(e.sampleRate);
+
+ball.setGravity(params[GRAVITY].getValue());
+ball.setBounce(params[BOUNCE].getValue());
+float h = ball.process(inputs[TRIG].getVoltage() &gt;= 1.f);
+outputs[OUT].setVoltage(10.f * h);
+// Each impact as a trigger: the ball has just hit the floor
+outputs[HITS].setVoltage(h == 0.f &amp;&amp; lastHeight &gt; 0.f ? 10.f : 0.f);
+lastHeight = h;</code></pre>
+
+<!-- ===================================================================== -->
+<h2 id="mod-lorenz">Lorenz</h2>
+<p class="origin"><code>#include "ml/mod/lorenz.h"</code> · from Streams</p>
+<p>A chaotic modulation source with three smooth, endlessly varying outputs that never quite repeat.</p>
+<p><strong>How it works.</strong> The Lorenz system describes a point moving through 3D space under three linked equations. With the classic constants it loops round two "wings", switching between them unpredictably: the famous butterfly. Each sample moves the point a small step; the rate sets the step size.</p>
+<table>
+<tr><th>Call</th><th>Effect</th></tr>
+<tr><td><code>setRate(x)</code></td><td>0..1, exponential: from a slow drift up to audio-rate buzz.</td></tr>
+<tr><td><code>process()</code></td><td>Advances one sample; returns <code>x()</code>.</td></tr>
+<tr><td><code>x()</code>, <code>y()</code>, <code>z()</code></td><td>About ±1 each. x and y swing between the wings; z rises and falls with each loop.</td></tr>
+</table>
+<pre><code>ml::Lorenz lorenz;   // onSampleRateChange: lorenz.init(e.sampleRate);
+
+lorenz.setRate(params[RATE].getValue());
+lorenz.process();
+outputs[X].setVoltage(5.f * lorenz.x());
+outputs[Y].setVoltage(5.f * lorenz.y());
+outputs[Z].setVoltage(5.f * lorenz.z());</code></pre>
+
+<!-- ===================================================================== -->
+<h2 id="mod-quantizer">Quantizer</h2>
+<p class="origin"><code>#include "ml/mod/quantizer.h"</code> · from Marbles</p>
+<p>Snaps a pitch CV to a scale, with an "amount" control that thins the scale down to its most important notes.</p>
+<p><strong>How it works.</strong> Each scale degree has a weight from 0 to 255; in C major, C is 255, G 192, E and B 128, and so on. Turning <code>amount</code> up raises a threshold:</p>
+<ul>
+  <li>at 0, nothing is quantised;</li>
+  <li>just above 0, every note is allowed (chromatic);</li>
+  <li>higher, only notes above the threshold remain: the scale, then a pentatonic-like subset, then the triad, then root and fifth, and finally the root alone.</li>
+</ul>
+<p>Hysteresis stops the output flickering when the input sits halfway between two notes.</p>
+<table>
+<tr><th>Call</th><th>Effect</th></tr>
+<tr><td><code>init(scale)</code></td><td>A <code>Quantizer::Scale</code>: base interval (1 V = octave), number of degrees, and {voltage, weight} for each.</td></tr>
+<tr><td><code>Quantizer::preset(p)</code></td><td>Marbles' presets: <code>MAJOR</code>, <code>MINOR</code>, <code>PENTATONIC</code>, <code>PELOG</code>, <code>RAAG_BHAIRAV</code>, <code>RAAG_SHRI</code>.</td></tr>
+<tr><td><code>process(volts, amount, hysteresis = true)</code></td><td>Returns the quantised pitch in volts.</td></tr>
+</table>
+<pre><code>ml::Quantizer quant;
+MyModule() { quant.init(ml::Quantizer::preset(ml::Quantizer::MINOR)); }
+
+float amount = params[AMOUNT].getValue();   // 0 = off ... 1 = root only
+outputs[OUT].setVoltage(quant.process(inputs[IN].getVoltage(), amount));</code></pre>
+<pre><code>// A custom scale: a whole-tone scale, all notes equally important
+ml::Quantizer::Scale wholeTone = {1.f, 6, {}};
+for (int i = 0; i &lt; 6; ++i) wholeTone.degree[i] = {i * 2.f / 12.f, 200};
+quant.init(wholeTone);</code></pre>
+
+<!-- ===================================================================== -->
+<h2 id="mod-hysteresis_quantizer">HysteresisQuantizer</h2>
+<p class="origin"><code>#include "ml/mod/hysteresis_quantizer.h"</code> · from stmlib</p>
+<p>Turns a continuous 0..1 value (a knob or a CV) into one of N steps, without flickering between two steps near a boundary. Use it for mode selectors, octave switches, or choosing from a list by CV.</p>
+<p><strong>How it works.</strong> To change step, the value has to go a little past the halfway point (by the hysteresis, a fraction of a step), so small noise near a boundary changes nothing.</p>
+<table>
+<tr><th>Call</th><th>Effect</th></tr>
+<tr><td><code>init(numSteps, hysteresis = 0.25, symmetric = false)</code></td><td>Not symmetric: each step gets an equal share of 0..1. Symmetric: step 0 is exactly at 0 and the last step exactly at 1.</td></tr>
+<tr><td><code>process(value)</code></td><td>Returns the step, 0..numSteps−1. <code>value()</code> is the latest.</td></tr>
+</table>
+<pre><code>ml::HysteresisQuantizer waveSelect;
+MyModule() { waveSelect.init(5); }
+
+// Pick one of 5 waveforms with a knob plus CV, without chattering
+int wave = waveSelect.process(ml::clamp(params[WAVE].getValue() + inputs[WAVE_CV].getVoltage() / 10.f, 0.f, 1.f));</code></pre>
+
+<!-- ===================================================================== -->
+<h2 id="mod-lag">Lag</h2>
+<p class="origin"><code>#include "ml/mod/lag.h"</code> · from Marbles</p>
+<p>Clock-synchronised glide between stepped values, from sharp steps to smooth glides to S-curves, always in time with the clock. Marbles' "steps" control.</p>
+<p><strong>How it works.</strong> The glide time follows the clock: a phase ramp (0..1 per step) tells the lag how long a step is, so the same setting sounds proportional at any tempo.</p>
+<ul>
+  <li><strong>Smoothness 0 to 0.6:</strong> a low-pass glide, from instant to about half a step.</li>
+  <li><strong>Smoothness 0.6 to 1:</strong> a crossfade into interpolation along the step, from an S-curve to linear, so the output traces a smooth path through the values.</li>
+</ul>
+<table>
+<tr><th>Call</th><th>Effect</th></tr>
+<tr><td><code>init()</code></td><td>Resets.</td></tr>
+<tr><td><code>resetRamp()</code></td><td>Call at each new step, so interpolation starts from the current output.</td></tr>
+<tr><td><code>process(value, smoothness, phase)</code></td><td>The current step's value, smoothness 0..1, and the phase within the step.</td></tr>
+</table>
+<pre><code>// Random steps on a clock, smoothed in time with it
+ml::ClockToRamp clock;
+ml::Lag lag;
+ml::Random rng;
+float value = 0.f, previousRamp = 0.f;
+
+float ramp = clock.process(inputs[CLOCK].getVoltage() &gt;= 1.f);
+if (ramp &lt; previousRamp) {          // the ramp wrapped: a new step
+    value = rng.uniform();
+    lag.resetRamp();
+}
+previousRamp = ramp;
+outputs[OUT].setVoltage(10.f * lag.process(value, params[STEPS].getValue(), ramp));</code></pre>
+
+<!-- ===================================================================== -->
+<h2 id="mod-random_sequence">RandomSequence</h2>
+<p class="origin"><code>#include "ml/mod/random_sequence.h"</code> · from Marbles</p>
+<p>Random values that can loop: Marbles' "déjà vu".</p>
+<ul>
+  <li>At 0 every value is new.</li>
+  <li>Turning it up makes the sequence repeat a loop of recent values, more and more faithfully.</li>
+  <li>At 0.5 it locks to the loop.</li>
+  <li>Past 0.5 it jumps randomly around inside the loop.</li>
+</ul>
+<p><strong>How it works.</strong> A loop holds the last <code>length</code> values. At each step a "mutation" happens with probability (2·dejaVu − 1)², which is high at both ends and zero in the middle. Below 0.5, a mutation replaces the loop's next value with a fresh one, so the loop slowly evolves. Above 0.5 it jumps to a random place in the loop. Otherwise the sequence steps through the loop in order. <code>next(input)</code> records outside values instead, which makes it a looping sample-and-hold or shift register.</p>
+<p>Not included: Marbles' replay and history features, which belong to the module.</p>
+<table>
+<tr><th>Call</th><th>Effect</th></tr>
+<tr><td><code>init(seed = 0x21)</code></td><td>Fills the loop with random values.</td></tr>
+<tr><td><code>setDejaVu(x)</code>, <code>setLength(n)</code></td><td>0..1; loop length 1..16 steps.</td></tr>
+<tr><td><code>next()</code>, <code>next(input)</code></td><td>The next value, 0..1; or record the input (0..1).</td></tr>
+<tr><td><code>reset()</code></td><td>Restart the loop from its first step.</td></tr>
+</table>
+<pre><code>// Marbles-style: a clocked random voltage with deja vu and loop length
+ml::RandomSequence seq;
+dsp::SchmittTrigger clockTrig;
+float held = 0.f;
+MyModule() { seq.init(); }
+
+seq.setDejaVu(params[DEJA_VU].getValue());
+seq.setLength(1 + int(params[LENGTH].getValue() * 15.f));
+if (clockTrig.process(inputs[CLOCK].getVoltage(), 0.1f, 1.f)) held = seq.next();
+outputs[OUT].setVoltage(10.f * held - 5.f);</code></pre>
+<pre><code>// Looping sample-and-hold: sample the input, then loop what was sampled
+if (clockTrig.process(inputs[CLOCK].getVoltage(), 0.1f, 1.f)) {
+    float in = ml::clamp(inputs[IN].getVoltage() / 10.f + 0.5f, 0.f, 1.f);
+    held = seq.next(in);   // deja vu 0: always records; 0.5: replays the loop
+}</code></pre>
+
+</main>
+</div>
+</body>
+</html>

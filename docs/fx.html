@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Effects · mutablelib</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="page">
+<nav>
+  <div class="title">mutablelib</div>
+  <a href="index.html">Overview</a>
+  <a href="setup.html">Getting started</a>
+  <a href="tutorial.html">Tutorial</a>
+  <a href="core.html">Core</a>
+  <a href="physical.html">Physical models</a>
+  <a href="dynamics.html">Dynamics</a>
+  <a href="fx.html" class="here">Effects</a>
+  <a href="drums.html">Drums</a>
+  <a href="mod.html">Modulation</a>
+  <a href="osc.html">Oscillators</a>
+  <a href="noise.html">Noise</a>
+  <a href="spectral.html">Spectral</a>
+  <a href="plumbing.html">Plumbing</a>
+</nav>
+<main>
+
+<h1>Effects</h1>
+<p class="lede">The effects built into Rings, Elements, Clouds and Plaits, as separate parts.</p>
+<p>The stereo effects take <code>float&amp; left, float&amp; right</code> and process in place. The mono ones take a sample and return one. The delay-based effects allocate memory in <code>init()</code>, so call it from <code>onSampleRateChange</code>.</p>
+
+<!-- ===================================================================== -->
+<h2 id="fx-reverb">Reverb</h2>
+<p class="origin"><code>#include "ml/fx/reverb.h"</code> · from Rings, Elements and Clouds</p>
+<p>A stereo plate-style reverb with a smooth, dense tail, and the same effect each of those modules has built in. Pick a module's tuning with a preset.</p>
+<p><strong>How it works.</strong> This is the "Griesinger" design from Jon Dattorro's 1997 paper:</p>
+<ol>
+  <li>The input passes through four all-pass filters, which smear each sound into a dense spray of echoes.</li>
+  <li>That feeds a figure-of-eight loop of long delays and more all-passes. Each half of the loop feeds the other, with a low-pass inside so highs die first, as in a real room.</li>
+  <li>Left and right are taken from different halves, which gives a wide stereo image.</li>
+  <li>Slow LFOs wobble some delay taps to blur metallic ringing.</li>
+</ol>
+<table>
+<tr><th>Call</th><th>Range</th><th>Effect</th></tr>
+<tr><td><code>init(sampleRate, preset)</code></td><td></td><td><code>Reverb::RINGS</code> (brighter, shorter), <code>ELEMENTS</code> (larger; the default) or <code>CLOUDS</code> (smaller, denser).</td></tr>
+<tr><td><code>setAmount(x)</code></td><td>0..1</td><td>Dry/wet mix.</td></tr>
+<tr><td><code>setTime(x)</code></td><td>0..1</td><td>Decay: 0.5 is a small room, 0.9 a hall, 0.98 near-infinite.</td></tr>
+<tr><td><code>setInputGain(x)</code></td><td>0..1</td><td>Level into the reverb. The modules used 0.2; keep it low, because the loop has a lot of gain.</td></tr>
+<tr><td><code>setDiffusion(x)</code></td><td>0..1</td><td>How smeared the echoes are. Default 0.625.</td></tr>
+<tr><td><code>setLp(x)</code></td><td>0..1</td><td>Damping: 1 is bright; lower values darken the tail faster.</td></tr>
+<tr><td><code>clear()</code></td><td></td><td>Silence the tail.</td></tr>
+<tr><td><code>process(l, r)</code></td><td></td><td>Stereo in, stereo out, in place. For mono input pass the same value as both.</td></tr>
+</table>
+<p>The modules' own settings make good starting points:</p>
+<ul>
+  <li><strong>Rings:</strong> amount 0.1–0.6, time 0.35–0.98, lp 0.3–0.9, all following its damping and brightness knobs.</li>
+  <li><strong>Clouds:</strong> diffusion 0.7, time 0.35–0.98, lp 0.6–0.97.</li>
+</ul>
+<pre><code>ml::Reverb reverb;
+
+void onSampleRateChange(const SampleRateChangeEvent&amp; e) override {
+    reverb.init(e.sampleRate, ml::Reverb::ELEMENTS);
+}
+
+void process(const ProcessArgs&amp; args) override {
+    float size = params[SIZE].getValue();
+    reverb.setAmount(params[MIX].getValue());
+    reverb.setTime(0.35f + 0.63f * size);
+    reverb.setLp(0.3f + 0.6f * params[TONE].getValue());
+    float l = inputs[LEFT].getVoltage() / 5.f;
+    float r = inputs[RIGHT].isConnected() ? inputs[RIGHT].getVoltage() / 5.f : l;
+    reverb.process(l, r);
+    outputs[OUT_L].setVoltage(5.f * l);
+    outputs[OUT_R].setVoltage(5.f * r);
+}</code></pre>
+<pre><code>// Shimmer-ish: pitch-shift the reverb's output up an octave and feed it back
+float l = in + 0.3f * fbL, r = in + 0.3f * fbR;
+reverb.process(l, r);
+fbL = shifterL.process(l);   // two ml::PitchShifter, setRatio(2.f)
+fbR = shifterR.process(r);</code></pre>
+
+<!-- ===================================================================== -->
+<h2 id="fx-diffuser">Diffuser</h2>
+<p class="origin"><code>#include "ml/fx/diffuser.h"</code> · from Clouds</p>
+<p>Smears sound in time without changing its tone: each click becomes a short, dense wash, like the very start of a reverb with no tail. Clouds uses it to blend grains into a texture. It also softens harsh transients, thickens sparse material, and gives a mono source a wide stereo image.</p>
+<p><strong>How it works.</strong> Four all-pass filters per channel, each a different length. An all-pass passes every frequency at equal level but delays each by a different amount, so together they scatter a transient over a few tens of milliseconds. Left and right use different lengths, which decorrelates them.</p>
+<table>
+<tr><th>Call</th><th>Range</th><th>Effect</th></tr>
+<tr><td><code>init(sampleRate)</code></td><td></td><td>Allocates the delays.</td></tr>
+<tr><td><code>setAmount(x)</code></td><td>0..1</td><td>Dry/wet mix.</td></tr>
+<tr><td><code>setDiffusion(x)</code></td><td>0..1</td><td>Amount of smearing. Clouds uses 0.625.</td></tr>
+<tr><td><code>process(l, r)</code></td><td></td><td>In place.</td></tr>
+</table>
+<pre><code>// Turn a dry percussive loop into a soft, wide texture
+diffuser.setAmount(params[TEXTURE].getValue());
+float l = inputs[IN].getVoltage() / 5.f, r = l;   // mono in, stereo out
+diffuser.process(l, r);
+outputs[OUT_L].setVoltage(5.f * l);
+outputs[OUT_R].setVoltage(5.f * r);</code></pre>
+
+<!-- ===================================================================== -->
+<h2 id="fx-chorus">Chorus</h2>
+<p class="origin"><code>#include "ml/fx/chorus.h"</code> · from Rings</p>
+<p>A gentle, slow and wide stereo chorus.</p>
+<p><strong>How it works.</strong> The input goes into a delay line read by four heads 15–30 ms back. Each head is swept by a slow LFO (0.2 Hz and 0.26 Hz, in sine and cosine phases). A delayed copy whose delay keeps changing is slightly detuned, and mixing it with the dry signal thickens the sound. Left and right use different heads and phases.</p>
+<table>
+<tr><th>Call</th><th>Range</th><th>Effect</th></tr>
+<tr><td><code>init(sampleRate)</code></td><td></td><td>Allocates the delay.</td></tr>
+<tr><td><code>setAmount(x)</code></td><td>0..1</td><td>Wet amount. The dry level drops by half the wet amount.</td></tr>
+<tr><td><code>setDepth(x)</code></td><td>0..1</td><td>Sweep depth, up to ±8 ms.</td></tr>
+<tr><td><code>process(l, r)</code></td><td></td><td>In place.</td></tr>
+</table>
+<pre><code>ml::Chorus chorus;
+// onSampleRateChange: chorus.init(e.sampleRate);
+
+chorus.setAmount(params[MIX].getValue());
+chorus.setDepth(params[DEPTH].getValue());
+float l = inputs[IN_L].getVoltage() / 5.f;
+float r = inputs[IN_R].getNormalVoltage(inputs[IN_L].getVoltage()) / 5.f;
+chorus.process(l, r);
+outputs[OUT_L].setVoltage(5.f * l);
+outputs[OUT_R].setVoltage(5.f * r);</code></pre>
+
+<!-- ===================================================================== -->
+<h2 id="fx-ensemble">Ensemble</h2>
+<p class="origin"><code>#include "ml/fx/ensemble.h"</code> · from Rings</p>
+<p>The lush, shimmering chorus of 1970s string machines such as the Solina and the ARP String Ensemble. Put it after a saw or pulse oscillator, or a divide-down organ, for instant string pads.</p>
+<p><strong>How it works.</strong> Three delay taps per side, their modulation spread 120° apart, each swept by a slow (0.75 Hz) and a fast (6.6 Hz) LFO together. Because the three taps are at different phases, some always go sharp while others go flat: the sound thickens while its average pitch stays steady.</p>
+<table>
+<tr><th>Call</th><th>Range</th><th>Effect</th></tr>
+<tr><td><code>init(sampleRate)</code></td><td></td><td>Allocates the delays.</td></tr>
+<tr><td><code>setAmount(x)</code></td><td>0..1</td><td>Wet amount. The dry level drops by half the wet amount.</td></tr>
+<tr><td><code>setDepth(x)</code></td><td>0..1</td><td>Modulation depth, up to about ±3 ms.</td></tr>
+<tr><td><code>process(l, r)</code></td><td></td><td>In place.</td></tr>
+</table>
+<pre><code>// String machine: a saw into the ensemble
+ensemble.setAmount(1.f);
+ensemble.setDepth(0.6f);
+float l = saw, r = saw;            // saw: any saw oscillator's output
+ensemble.process(l, r);
+outputs[OUT_L].setVoltage(5.f * l);
+outputs[OUT_R].setVoltage(5.f * r);</code></pre>
+
+<!-- ===================================================================== -->
+<h2 id="fx-pitch_shifter">PitchShifter</h2>
+<p class="origin"><code>#include "ml/fx/pitch_shifter.h"</code> · from Clouds</p>
+<p>Shifts audio up or down by any ratio in real time, with a slightly grainy "tape-splice" character.</p>
+<p><strong>How it works.</strong> The input is written into a short delay line, and a read head moves along it at a different speed from the writer: faster reading raises the pitch, slower lowers it, as with varispeed tape. The read head soon runs into the writer, so there are two heads half a window apart, each faded in and out by a triangle. One is always playing while the other jumps back, which hides the jumps.</p>
+<table>
+<tr><th>Call</th><th>Range</th><th>Effect</th></tr>
+<tr><td><code>init(sampleRate)</code></td><td></td><td>Allocates the delay.</td></tr>
+<tr><td><code>setRatio(r)</code></td><td>0.25..4</td><td>Pitch ratio: 2 is up an octave, 0.5 down an octave. Use <code>ml::semitonesToRatio()</code>.</td></tr>
+<tr><td><code>setSize(x)</code></td><td>0..1</td><td>Window length, about 4 to 64 ms. Short windows follow transients but buzz; long ones are smoother but smear. Changes are smoothed.</td></tr>
+<tr><td><code>process(in)</code></td><td></td><td>Mono. Use one instance per channel for stereo.</td></tr>
+</table>
+<pre><code>ml::PitchShifter shifter;
+// onSampleRateChange: shifter.init(e.sampleRate);
+
+// Transpose knob of ±24 semitones, plus a V/Oct input
+float semitones = params[TRANSPOSE].getValue() + 12.f * inputs[VOCT].getVoltage();
+shifter.setRatio(ml::semitonesToRatio(semitones));
+shifter.setSize(params[WINDOW].getValue());
+float in = inputs[IN].getVoltage() / 5.f;
+float mix = params[MIX].getValue();
+outputs[OUT].setVoltage(5.f * ml::crossfade(in, shifter.process(in), mix));</code></pre>
+
+<!-- ===================================================================== -->
+<h2 id="fx-overdrive">Overdrive</h2>
+<p class="origin"><code>#include "ml/fx/overdrive.h"</code> · from Plaits</p>
+<p>Soft-clipping distortion with built-in level compensation: more drive adds grit and sustain without the output getting much louder. Plaits uses it on its kick drum.</p>
+<p><strong>How it works.</strong> The signal is boosted into a smooth clipper, then turned back down. The boost stays gentle for most of the knob and climbs to about 24× at the top. The cut is the inverse of how loud a full-scale signal comes out of the clipper. Drive changes are smoothed over about 1 ms.</p>
+<table>
+<tr><th>Call</th><th>Range</th><th>Effect</th></tr>
+<tr><td><code>init(sampleRate)</code></td><td></td><td>Sets the smoothing time.</td></tr>
+<tr><td><code>setDrive(x)</code></td><td>0..1</td><td>0 gives gentle warmth at about unity gain; 1 is heavily clipped.</td></tr>
+<tr><td><code>process(in)</code></td><td></td><td>Mono; returns the driven signal.</td></tr>
+</table>
+<pre><code>ml::Overdrive drive;
+// onSampleRateChange: drive.init(e.sampleRate);
+
+float amount = ml::clamp(params[DRIVE].getValue() + inputs[DRIVE_CV].getVoltage() / 10.f, 0.f, 1.f);
+drive.setDrive(amount);
+outputs[OUT].setVoltage(5.f * drive.process(inputs[IN].getVoltage() / 5.f));</code></pre>
+
+<!-- ===================================================================== -->
+<h2 id="fx-wavefolder">Wavefolder</h2>
+<p class="origin"><code>#include "ml/fx/wavefolder.h"</code> · from Plaits' waveshaping engine</p>
+<p>West Coast-style waveshaping: as the input is driven harder, its peaks fold back on themselves, adding bright, shifting harmonics. There are two curves:</p>
+<ul>
+  <li><code>process()</code>: a smooth sine-based fold, bright and bell-like. This is Plaits' main output.</li>
+  <li><code>analog()</code>: a model of an analog folder circuit (five op-amp stages and a diode, in the style of the Buchla 259), rougher and more vocal. This is Plaits' AUX output.</li>
+</ul>
+<p><strong>How it works.</strong> The input, scaled by the fold amount, reads a transfer curve. The curve is nearly straight at the centre and wiggles further out, so pushing the signal outwards turns each peak into extra wiggles, which are extra harmonics.</p>
+<p><strong>Aliasing:</strong> folding creates harmonics far above the input's own. Feed it smooth signals such as sine, triangle or a filtered saw, and lower the amount at high pitches; Plaits does this automatically.</p>
+<table>
+<tr><th>Call</th><th>Range</th><th>Effect</th></tr>
+<tr><td><code>init()</code></td><td></td><td>Builds the curves (once, shared by all instances).</td></tr>
+<tr><td><code>setAmount(x)</code></td><td>0..1</td><td>Fold amount.</td></tr>
+<tr><td><code>process(in)</code></td><td>in ±1</td><td>Returns the smooth fold; <code>analog()</code> then holds the analog fold of the same sample.</td></tr>
+</table>
+<pre><code>ml::Wavefolder folder;
+MyModule() { folder.init(); }   // in the module constructor
+
+// A sine (or triangle) into the folder; FOLD knob plus CV
+float sine = std::sin(2.f * M_PI * phase);   // phase: your oscillator's 0..1 phase
+folder.setAmount(ml::clamp(params[FOLD].getValue() + inputs[FOLD_CV].getVoltage() / 10.f, 0.f, 1.f));
+outputs[OUT].setVoltage(5.f * folder.process(sine));
+outputs[ANALOG].setVoltage(5.f * folder.analog());</code></pre>
+
+<!-- ===================================================================== -->
+<h2 id="fx-decimator">Decimator</h2>
+<p class="origin"><code>#include "ml/fx/decimator.h"</code> · from Plaits</p>
+<p>The lo-fi crunch of old samplers and game consoles: the signal is sampled and held at a lower rate.</p>
+<p><strong>How it works.</strong> A clock ticks at the target rate; at each tick the input is captured and held. Done naively, the steps land on whole host samples and add harsh aliasing that changes with the host rate. Here each step is placed at its exact fractional time and its edge smoothed with PolyBLEP, so you get the intended stair-step sound, the same at any host rate. It adds one sample of latency while active, and passes the signal straight through at or above the host rate.</p>
+<table>
+<tr><th>Call</th><th>Range</th><th>Effect</th></tr>
+<tr><td><code>init(sampleRate)</code></td><td></td><td>Resets.</td></tr>
+<tr><td><code>setRate(hz)</code></td><td>Hz</td><td>Target sample rate. 2–8 kHz sounds crunchy; a few hundred Hz is extreme.</td></tr>
+<tr><td><code>process(in)</code></td><td></td><td>Mono.</td></tr>
+</table>
+<pre><code>ml::Decimator crush;
+// onSampleRateChange: crush.init(e.sampleRate);
+
+// Knob sweeps the rate exponentially from 200 Hz to 20 kHz
+float rate = 200.f * std::pow(100.f, params[RATE].getValue());
+crush.setRate(rate);
+outputs[OUT].setVoltage(5.f * crush.process(inputs[IN].getVoltage() / 5.f));</code></pre>
+
+<!-- ===================================================================== -->
+<h2 id="fx-limiter">Limiter</h2>
+<p class="origin"><code>#include "ml/fx/limiter.h"</code> · from Rings and Warps</p>
+<p>Keeps a signal within full scale smoothly, without hard clipping. Put it last in anything that can get loud: resonators, feedback patches, stacked voices.</p>
+<p><strong>How it works.</strong> A peak follower rises fast (about 0.5 ms) and falls slowly (about 1 s), so the gain doesn't pump on each waveform cycle. Above full scale, the gain becomes 1/peak. A soft clipper then rounds off transients the follower is too slow to catch. In stereo, both channels share one gain, which also watches the left-right difference, so the stereo image holds steady.</p>
+<table>
+<tr><th>Call</th><th>Range</th><th>Effect</th></tr>
+<tr><td><code>init(sampleRate)</code></td><td></td><td>Resets the follower.</td></tr>
+<tr><td><code>setPreGain(g)</code></td><td>1+</td><td>Gain before limiting. Raise it to make quiet material louder; peaks are caught.</td></tr>
+<tr><td><code>process(in)</code></td><td></td><td>Mono.</td></tr>
+<tr><td><code>process(l, r)</code></td><td></td><td>Stereo, in place, linked gain.</td></tr>
+</table>
+<pre><code>ml::Limiter limiter;
+// onSampleRateChange: limiter.init(e.sampleRate);
+
+// Final stage of a stereo voice: never exceeds ±5 V
+limiter.setPreGain(1.f + 3.f * params[LOUDNESS].getValue());
+float l = voiceL, r = voiceR;
+limiter.process(l, r);
+outputs[OUT_L].setVoltage(5.f * l);
+outputs[OUT_R].setVoltage(5.f * r);</code></pre>
+
+<!-- ===================================================================== -->
+<h2 id="fx-fx_engine">FxEngine</h2>
+<p class="origin"><code>#include "ml/fx/fx_engine.h"</code> · from Rings, Elements and Clouds</p>
+<p>The toolkit the reverb, diffuser, chorus, ensemble and pitch shifter are built with. Use it to design your own delay-network effects.</p>
+<p><strong>How it works.</strong> All delay lines live in one circular buffer with a single write pointer that moves one step per sample, so every line advances at once. Each sample you run a short "program" that works like a tiny DSP chip:</p>
+<ul>
+  <li>An <em>accumulator</em> holds the signal being built.</li>
+  <li>You <code>read</code> values into it, filter it, and <code>write</code> it into delay lines.</li>
+  <li>Two slow LFOs are built in for modulating reads.</li>
+</ul>
+<table>
+<tr><th>Call</th><th>Effect</th></tr>
+<tr><td><code>reset()</code>, <code>addDelay(length)</code>, <code>allocate()</code></td><td>Setup, in <code>init</code>: declare lines (sized from the sample rate), then allocate. <code>addDelay</code> returns a <code>FxEngine::Delay</code> handle.</td></tr>
+<tr><td><code>setLfoFrequency(i, f)</code></td><td>LFO <code>i</code> (0 or 1) at <code>f</code> = Hz / sampleRate.</td></tr>
+<tr><td><code>start()</code></td><td>Begin a sample: advance the lines, clear the accumulator.</td></tr>
+<tr><td><code>load(v)</code>, <code>read(v, scale)</code></td><td>acc = v; acc += v·scale.</td></tr>
+<tr><td><code>write(float&amp; v, scale)</code></td><td>v = acc, then acc ×= scale.</td></tr>
+<tr><td><code>read(line, offset, scale)</code>, <code>readTail(line, scale)</code></td><td>acc += line[offset]·scale; the tail is the oldest sample.</td></tr>
+<tr><td><code>write(line, scale)</code>, <code>write(line, offset, scale)</code></td><td>line[offset] = acc, then acc ×= scale.</td></tr>
+<tr><td><code>writeAllPass(line, scale)</code></td><td>After <code>readTail(line, g)</code>, <code>writeAllPass(line, -g)</code> completes an all-pass filter.</td></tr>
+<tr><td><code>interpolate(line, offset, scale)</code></td><td>Fractional read.</td></tr>
+<tr><td><code>interpolate(line, offset, lfo, amplitude, scale)</code></td><td>Fractional read with the offset swept by an LFO.</td></tr>
+<tr><td><code>lp(state, c)</code>, <code>hp(state, c)</code></td><td>One-pole filter on the accumulator.</td></tr>
+<tr><td><code>clear()</code></td><td>Silence all lines.</td></tr>
+</table>
+<pre><code>// A ping-pong delay with a damped, diffused feedback path
+struct PingPong {
+    ml::FxEngine e;
+    ml::FxEngine::Delay left, right, diffuse;
+    float damp = 0.f;
+
+    void init(float sr) {
+        e.reset();
+        left = e.addDelay(int(sr * 0.25f));     // 250 ms
+        right = e.addDelay(int(sr * 0.25f));
+        diffuse = e.addDelay(int(sr * 0.007f)); // 7 ms all-pass
+        e.allocate();
+    }
+
+    void process(float in, float feedback, float&amp; outL, float&amp; outR) {
+        e.start();
+        // Left line: input plus feedback from the right, smeared and damped
+        e.read(in);
+        e.readTail(right, feedback);
+        e.readTail(diffuse, 0.5f);
+        e.writeAllPass(diffuse, -0.5f);
+        e.lp(damp, 0.3f);
+        e.write(left, 0.f);
+        // Right line: fed only by the left, so echoes alternate sides
+        e.readTail(left, 1.f);
+        e.write(right, 0.f);
+        // Outputs: the far end of each line
+        e.readTail(left, 1.f);
+        e.write(outL, 0.f);
+        e.readTail(right, 1.f);
+        e.write(outR, 0.f);
+    }
+};</code></pre>
+
+</main>
+</div>
+</body>
+</html>

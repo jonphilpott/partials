@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plumbing · mutablelib</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="page">
+<nav>
+  <div class="title">mutablelib</div>
+  <a href="index.html">Overview</a>
+  <a href="setup.html">Getting started</a>
+  <a href="tutorial.html">Tutorial</a>
+  <a href="core.html">Core</a>
+  <a href="physical.html">Physical models</a>
+  <a href="dynamics.html">Dynamics</a>
+  <a href="fx.html">Effects</a>
+  <a href="drums.html">Drums</a>
+  <a href="mod.html">Modulation</a>
+  <a href="osc.html">Oscillators</a>
+  <a href="noise.html">Noise</a>
+  <a href="spectral.html">Spectral</a>
+  <a href="plumbing.html" class="here">Plumbing</a>
+</nav>
+<main>
+
+<h1>Plumbing</h1>
+<p class="lede">Filters, delays and helpers the other components are built from. They are all useful on their own.</p>
+
+<!-- ===================================================================== -->
+<h2 id="filter-svf">Svf</h2>
+<p class="origin"><code>#include "ml/filter/svf.h"</code> · from stmlib</p>
+<p>A state-variable filter: one 12 dB/octave filter that gives low-pass, band-pass and high-pass at the same time. Gillet uses it everywhere: as a synth filter, for each mode of the modal resonator, as formant filters and in the drums.</p>
+<p><strong>How it works.</strong> Two integrators sit in a feedback loop. This is the "zero-delay feedback" version: it solves the loop for the current sample, rather than using the previous one, so the filter stays in tune right up to Nyquist and its settings can change on every sample without clicks or instability.</p>
+<table>
+<tr><th>Call</th><th>Effect</th></tr>
+<tr><td><code>init(sampleRate)</code></td><td>Set the rate and clear the state.</td></tr>
+<tr><td><code>reset()</code></td><td>Clear the state (silence a ringing filter).</td></tr>
+<tr><td><code>setFrequency(hz, q)</code></td><td>Cutoff and resonance. Q of 0.5 gives no peak, 0.707 is flat (Butterworth), 2–5 is a resonant synth filter, 10 and above ring like a bell.</td></tr>
+<tr><td><code>process(in)</code></td><td>Returns <code>ml::SvfOut</code> with fields <code>lp</code>, <code>bp</code> and <code>hp</code>. Outputs you don't use cost nothing.</td></tr>
+<tr><td><code>r()</code></td><td>1/q. <code>bp * r()</code> is a band-pass whose peak stays at unity gain whatever the Q.</td></tr>
+<tr><td><code>setCoefficients(f, q, approx)</code></td><td>Low-level: <code>f</code> is cutoff / sample rate, and <code>approx</code> is a <code>ml::TanApprox</code> (see below).</td></tr>
+<tr><td><code>setGQ(g, q)</code>, <code>g()</code></td><td>Set or read the pre-computed frequency coefficient, for example to copy tuning from one filter to another.</td></tr>
+</table>
+<pre><code>ml::Svf filter;
+// onSampleRateChange: filter.init(e.sampleRate);
+
+void process(const ProcessArgs&amp; args) override {
+    float cutoff = ml::voltToHz(params[CUTOFF].getValue() + inputs[CUTOFF_CV].getVoltage());
+    float q = 0.5f + 20.f * params[RESONANCE].getValue();
+    filter.setFrequency(ml::clamp(cutoff, 20.f, 20000.f), q);
+
+    ml::SvfOut o = filter.process(inputs[IN].getVoltage() / 5.f);
+    outputs[LP].setVoltage(5.f * o.lp);
+    outputs[BP].setVoltage(5.f * o.bp);
+    outputs[HP].setVoltage(5.f * o.hp);
+    outputs[NOTCH].setVoltage(5.f * (o.lp + o.hp));   // notch = LP + HP
+}</code></pre>
+<p><strong><code>tanApprox(f, approx)</code></strong>: the filter needs <code>tan(π·f)</code>. Gillet's code uses cheap polynomial versions of it, and ports keep the same one so they sound identical. Options:</p>
+<ul>
+  <li><code>Exact</code>: <code>std::tan</code>, used by <code>setFrequency</code>.</li>
+  <li><code>Accurate</code>: good everywhere.</li>
+  <li><code>Fast</code>: good from 16 Hz to 16 kHz at 48 kHz.</li>
+  <li><code>Dirty</code>: good below about 8 kHz.</li>
+</ul>
+<pre><code>// A bank of 32 filters retuned every sample: the cheap approximation is plenty
+float f = hz * args.sampleTime;   // cutoff / sample rate
+bank[i].setCoefficients(f, 50.f, ml::TanApprox::Fast);</code></pre>
+
+<!-- ===================================================================== -->
+<h2 id="filter-one_pole">OnePole</h2>
+<p class="origin"><code>#include "ml/filter/one_pole.h"</code> · from stmlib</p>
+<p>The simplest filter: a gentle 6 dB/octave low-pass and high-pass. Use it to tame harsh highs, take the edge off a square wave, remove rumble, or smooth a CV with a cutoff in Hz. It is built the same way as the Svf, so it stays accurate up to Nyquist.</p>
+<table>
+<tr><th>Call</th><th>Effect</th></tr>
+<tr><td><code>init(sampleRate)</code>, <code>reset()</code></td><td>As for Svf.</td></tr>
+<tr><td><code>setFrequency(hz)</code></td><td>Cutoff: the −3 dB point.</td></tr>
+<tr><td><code>process(in)</code></td><td>Returns <code>ml::OnePoleOut</code> with fields <code>lp</code> and <code>hp</code>.</td></tr>
+<tr><td><code>setCoefficients(f, approx)</code></td><td>Low-level: cutoff / sample rate, plus a <code>TanApprox</code>.</td></tr>
+</table>
+<pre><code>ml::OnePole tone;
+// onSampleRateChange: tone.init(e.sampleRate);
+
+// A tilt "tone" knob: below the middle darkens (low-pass), above thins (high-pass)
+tone.setFrequency(800.f);
+ml::OnePoleOut o = tone.process(in);
+float t = params[TONE].getValue();          // 0..1, 0.5 = flat
+float out = t &lt; 0.5f ? ml::crossfade(o.lp, in, t * 2.f)
+                     : ml::crossfade(in, o.hp, t * 2.f - 1.f);</code></pre>
+
+<!-- ===================================================================== -->
+<h2 id="filter-dc_blocker">DcBlocker</h2>
+<p class="origin"><code>#include "ml/filter/dc_blocker.h"</code> · from stmlib</p>
+<p>Removes DC offset and slow drift: a one-pole high-pass with a very low cutoff. Resonators, feedback loops and asymmetric distortion can all build up DC, which wastes headroom and makes clicks when a downstream VCA opens. Put one before the output.</p>
+<table>
+<tr><th>Call</th><th>Effect</th></tr>
+<tr><td><code>init(sampleRate, cutoffHz = 10)</code></td><td>5–20 Hz is typical.</td></tr>
+<tr><td><code>reset()</code></td><td>Clear the state.</td></tr>
+<tr><td><code>process(in)</code></td><td>Returns the input minus its DC.</td></tr>
+</table>
+<pre><code>ml::DcBlocker dc;
+// onSampleRateChange: dc.init(e.sampleRate, 10.f);
+
+// Half-wave rectified distortion is lopsided, so its output carries DC
+float y = in &gt; 0.f ? in : 0.2f * in;
+outputs[OUT].setVoltage(5.f * dc.process(y));</code></pre>
+
+<!-- ===================================================================== -->
+<h2 id="fx-delay_line">DelayLine</h2>
+<p class="origin"><code>#include "ml/fx/delay_line.h"</code> · from stmlib</p>
+<p>A circular buffer: write one sample at a time, read back from any point in the past. It is the basic part of echoes, choruses, comb filters, strings and reverbs.</p>
+<p><strong>Memory.</strong> <code>init(maxDelaySamples)</code> allocates the buffer, so call it from <code>onSampleRateChange</code>, never from <code>process</code>. Size it from the sample rate so delay times hold in seconds.</p>
+<table>
+<tr><th>Call</th><th>Effect</th></tr>
+<tr><td><code>init(maxDelay)</code></td><td>Allocate room for up to <code>maxDelay</code> samples. The buffer is rounded up to a power of two.</td></tr>
+<tr><td><code>reset()</code></td><td>Clear to silence.</td></tr>
+<tr><td><code>write(x)</code></td><td>Push one sample.</td></tr>
+<tr><td><code>read(size_t n)</code></td><td>The sample written <code>n</code> writes ago; <code>read(1)</code> is the latest.</td></tr>
+<tr><td><code>read(float d)</code></td><td>Fractional delay, linear interpolation. Cheap, slightly dull.</td></tr>
+<tr><td><code>readHermite(float d)</code></td><td>Fractional delay, cubic interpolation. Brighter; use it for tuned delays and modulated delays.</td></tr>
+<tr><td><code>allpass(in, n, g)</code></td><td>An all-pass filter on the line. It passes every frequency at the same level but smears them in time, which is the basic part of reverb diffusion.</td></tr>
+</table>
+<pre><code>ml::DelayLine line;
+
+void onSampleRateChange(const SampleRateChangeEvent&amp; e) override {
+    line.init(size_t(e.sampleRate * 2.f));     // up to 2 seconds
+}
+
+void process(const ProcessArgs&amp; args) override {
+    float in = inputs[IN].getVoltage() / 5.f;
+    float time = 0.01f + 1.99f * params[TIME].getValue();      // seconds
+    float echo = line.readHermite(time * args.sampleRate);
+    line.write(in + params[FEEDBACK].getValue() * echo);
+    outputs[OUT].setVoltage(5.f * (in + echo));
+}</code></pre>
+<pre><code>// A feedback comb filter tuned to a pitch: metallic, Karplus-Strong-like
+float period = args.sampleRate / ml::voltToHz(inputs[VOCT].getVoltage());
+float y = in + 0.95f * comb.readHermite(period);
+comb.write(y);</code></pre>
+
+<!-- ===================================================================== -->
+<h2 id="osc-sine">Sine oscillators</h2>
+<p class="origin"><code>#include "ml/osc/sine.h"</code> · SineOscillator from Plaits, CosineOscillator from stmlib</p>
+
+<h3>sineFromPhase(phase) and SineOscillator</h3>
+<p>A table-based sine: cheaper than <code>std::sin</code> and accurate to about −100 dB. <code>sineFromPhase(p)</code> turns a 0..1 phase into a sine; only the fractional part of the phase counts. <code>SineOscillator</code> is a plain sine oscillator built on it, for LFOs, test tones and FM.</p>
+<table>
+<tr><th>Call</th><th>Effect</th></tr>
+<tr><td><code>init(sampleRate)</code>, <code>reset()</code></td><td>Set the rate; <code>reset</code> restarts the phase at 0.</td></tr>
+<tr><td><code>setFrequency(hz)</code>, <code>process()</code></td><td>Next sample, ±1.</td></tr>
+<tr><td><code>next(f)</code>, <code>next(f, amplitude, sine, cosine)</code></td><td>Low-level: f is Hz / sample rate; the second form gives sine and cosine together.</td></tr>
+</table>
+<pre><code>ml::SineOscillator lfo;   // onSampleRateChange: lfo.init(e.sampleRate);
+
+lfo.setFrequency(0.1f + 10.f * params[RATE].getValue());   // 0.1 to 10 Hz
+outputs[LFO_OUT].setVoltage(5.f * lfo.process());
+
+// Two-operator FM with sineFromPhase: the modulator shifts the carrier's phase
+modPhase += hz * 2.f * args.sampleTime;
+carPhase += hz * args.sampleTime;
+float mod = ml::sineFromPhase(modPhase);
+float out = ml::sineFromPhase(carPhase + params[INDEX].getValue() * mod);</code></pre>
+
+<h3>CosineOscillator</h3>
+<p>Produces the series <code>0.5 + 0.5·cos(n·w)</code> for n = 0, 1, 2… at a cost of one multiply per value, using the recurrence <code>cos((n+1)w) = 2cos(w)·cos(nw) − cos((n−1)w)</code>. It is rarely a free-running audio oscillator. Its main use is computing a set of per-harmonic gains cheaply: harmonic k weighted by <code>0.5 + 0.5·cos(2πk·position)</code> is how a pickup or strike point shapes a spectrum.</p>
+<table>
+<tr><th>Call</th><th>Effect</th></tr>
+<tr><td><code>init(f)</code></td><td>Set w = 2π·f, where f is in cycles per step, and rewind.</td></tr>
+<tr><td><code>initApproximate(f)</code></td><td>The same with a cheaper, slightly less accurate cos(); the original code uses it.</td></tr>
+<tr><td><code>start()</code></td><td>Rewind to n = 0.</td></tr>
+<tr><td><code>next()</code>, <code>value()</code></td><td>The next value (0..1); the latest value again.</td></tr>
+</table>
+<pre><code>// Additive voice: 16 harmonics with a "pickup position" spectral comb
+ml::CosineOscillator gains;
+gains.init(params[POSITION].getValue());   // recompute once per sample
+float sum = 0.f;
+for (int k = 0; k &lt; 16; ++k) {
+    sum += harmonic[k] * gains.next();       // harmonic[k]: your partials
+}</code></pre>
+
+<!-- ===================================================================== -->
+<h2 id="osc-basic">BasicOscillator</h2>
+<p class="origin"><code>#include "ml/osc/basic.h"</code> · from Plaits</p>
+<p>Plaits' alias-free oscillator, with saw, triangle, variable-symmetry slope, pulse with variable width, filtered squares and an impulse train. It uses the <a href="#osc-polyblep">PolyBLEP</a> trick to remove aliasing, at the cost of one sample of latency. Rack already has good VCOs, so this is mainly plumbing for other components (the ring-mod hi-hat, wavefolder inputs), but it works well as a simple oscillator.</p>
+<p>It differs from Plaits in two ways: the dark square is scaled to about ±1 like the other shapes, and the start-up state is set from the shape, which removes a first-sample spike on <code>SLOPE</code> and <code>IMPULSE_TRAIN</code>.</p>
+<table>
+<tr><th>Call</th><th>Effect</th></tr>
+<tr><td><code>init(sampleRate)</code></td><td>Resets.</td></tr>
+<tr><td><code>setShape(s)</code></td><td><code>SAW</code>, <code>TRIANGLE</code>, <code>SLOPE</code> (triangle with variable symmetry), <code>SQUARE</code>, <code>SQUARE_BRIGHT</code> (thin, nasal), <code>SQUARE_DARK</code> (soft, hollow), <code>SQUARE_TRIANGLE</code> (smooth), <code>IMPULSE_TRAIN</code>.</td></tr>
+<tr><td><code>setFrequency(hz)</code></td><td>Up to a quarter of the sample rate.</td></tr>
+<tr><td><code>setPulseWidth(x)</code></td><td>0..1: the width for squares, the symmetry for <code>SLOPE</code>.</td></tr>
+<tr><td><code>process()</code></td><td>Next sample, about ±1.</td></tr>
+<tr><td><code>process(f, pw)</code></td><td>Low-level: f is Hz / sample rate.</td></tr>
+</table>
+<pre><code>ml::BasicOscillator osc;   // onSampleRateChange: osc.init(e.sampleRate);
+
+// A simple VCO: shape switch, PWM input
+osc.setShape(static_cast&lt;ml::BasicOscillator::Shape&gt;(int(params[SHAPE].getValue())));
+osc.setFrequency(ml::voltToHz(inputs[VOCT].getVoltage()));
+osc.setPulseWidth(ml::clamp(0.5f + inputs[PWM].getVoltage() / 10.f, 0.05f, 0.95f));
+outputs[OUT].setVoltage(5.f * osc.process());</code></pre>
+
+<!-- ===================================================================== -->
+<h2 id="osc-polyblep">PolyBLEP</h2>
+<p class="origin"><code>#include "ml/osc/polyblep.h"</code> · from stmlib</p>
+<p>Four small functions that remove aliasing from sudden jumps: the edges of saw and square waves, hard sync, sample and hold. The <a href="fx.html#fx-decimator">Decimator</a> uses them, and the oscillators will.</p>
+<p><strong>Why it's needed.</strong> A jump that falls between two samples gets rounded to the nearest one. The rounding error contains frequencies above Nyquist, which fold back down as the inharmonic whine of a naive digital oscillator.</p>
+<p><strong>How it works.</strong> If you know where the jump really happened (a fraction <code>t</code> of a sample ago, 0..1) and its size, a two-sample correction approximates a band-limited step ("BLEP"). Add <code>thisBlepSample(t)</code> × the jump to the current sample and <code>nextBlepSample(t)</code> × the jump to the next one; this means delaying the output by one sample. The <code>Integrated</code> versions correct a sudden change of <em>slope</em> (a corner, as in a triangle wave) instead of value.</p>
+<table>
+<tr><th>Function</th><th>Use</th></tr>
+<tr><td><code>thisBlepSample(t)</code>, <code>nextBlepSample(t)</code></td><td>Correct a step in value (saw reset, square edge).</td></tr>
+<tr><td><code>thisIntegratedBlepSample(t)</code>, <code>nextIntegratedBlepSample(t)</code></td><td>Correct a step in slope (triangle corner).</td></tr>
+</table>
+<pre><code>// An alias-free sawtooth: the naive ramp plus a BLEP at each reset
+float phase = 0.f, next = 0.f;   // members
+
+float sawProcess(float hz, float sampleTime) {
+    float inc = hz * sampleTime;
+    float out = next;                          // one sample of latency
+    next = 0.f;
+    phase += inc;
+    if (phase &gt;= 1.f) {
+        phase -= 1.f;
+        float t = phase / inc;                 // how far past the reset we are
+        out -= ml::thisBlepSample(t);          // the ramp drops by 1: jump = -1
+        next -= ml::nextBlepSample(t);
+    }
+    next += phase;                             // the naive ramp, delayed
+    return 2.f * out - 1.f;                    // 0..1 to ±1
+}</code></pre>
+
+</main>
+</div>
+</body>
+</html>

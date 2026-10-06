@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mutablelib</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="page">
+<nav>
+  <div class="title">mutablelib</div>
+  <a href="index.html" class="here">Overview</a>
+  <a href="setup.html">Getting started</a>
+  <a href="tutorial.html">Tutorial</a>
+  <a href="core.html">Core</a>
+  <a href="physical.html">Physical models</a>
+  <a href="dynamics.html">Dynamics</a>
+  <a href="fx.html">Effects</a>
+  <a href="drums.html">Drums</a>
+  <a href="mod.html">Modulation</a>
+  <a href="osc.html">Oscillators</a>
+  <a href="noise.html">Noise</a>
+  <a href="spectral.html">Spectral</a>
+  <a href="plumbing.html">Plumbing</a>
+</nav>
+<main>
+
+<h1>mutablelib</h1>
+<p class="lede">Emilie Gillet's Mutable Instruments DSP, taken apart into small building blocks for VCV Rack modules.</p>
+
+<p>Think of it as a lego set for new modules. Each component is one header containing one class: a resonator, a string, a reverb, a drum voice. It is not a way to rebuild Mutable modules: Rings, Clouds and Plaits already exist in Rack, and things Rack already does well, such as plain saw oscillators, are left out.</p>
+
+<h2>Using it in a Rack plugin</h2>
+<p>New to building Rack plugins? <a href="setup.html">Getting started</a> covers installing the tools and Rack SDK and building the example modules. Then the <a href="tutorial.html">tutorial</a> walks through building a module from scratch: a sawtooth oscillator into a low-pass filter.</p>
+<p>The library is header-only. Point your plugin's <code>Makefile</code> at it:</p>
+<pre><code>FLAGS += -I../mutablelib/include</code></pre>
+<p>Then include what you need. Every component follows the same pattern:</p>
+<pre><code>#include "ml/filter/svf.h"
+
+struct MyModule : Module {
+    ml::Svf filter;                          // plain member, no allocation
+
+    void onSampleRateChange(const SampleRateChangeEvent&amp; e) override {
+        filter.init(e.sampleRate);           // call before first process()
+    }
+
+    void process(const ProcessArgs&amp; args) override {
+        filter.setFrequency(ml::voltToHz(inputs[CUTOFF].getVoltage()), 0.707f);
+        float in = inputs[IN].getVoltage() / 5.f;   // Rack ±5 V → ±1
+        outputs[OUT].setVoltage(5.f * filter.process(in).lp);
+    }
+};</code></pre>
+<p><code>onSampleRateChange</code> also runs when the module is added, so <code>init()</code> there is enough.</p>
+<p>For quick experiments, <code>#include "ml/ml.h"</code> pulls in every component. In a finished module, include only what you use: compile times are shorter.</p>
+<p>Six complete example modules are in <code>examples/rack-plugin</code>; see <a href="setup.html">Getting started</a> to build them.</p>
+
+<h2>Conventions</h2>
+<table>
+<tr><th>Thing</th><th>Convention</th></tr>
+<tr><td>Audio</td><td>±1.0. Multiply by 5 for Rack's ±5 V.</td></tr>
+<tr><td>Frequency</td><td>Hz. Convert Rack pitch voltage with <code>ml::voltToHz()</code>.</td></tr>
+<tr><td>Other parameters</td><td>0..1 unless the component says otherwise. Times are in seconds.</td></tr>
+<tr><td>Setup</td><td><code>init(sampleRate)</code> resets state and sizes buffers. Safe to call again whenever the rate changes.</td></tr>
+<tr><td>Processing</td><td><code>process()</code> returns one sample. Stereo components take <code>float&amp; left, float&amp; right</code>.</td></tr>
+<tr><td>Triggers</td><td><code>trigger()</code>, or a <code>bool</code> argument to <code>process()</code>.</td></tr>
+<tr><td>Polyphony</td><td>One voice per instance. For 16 channels, hold an array of 16.</td></tr>
+<tr><td>Threads</td><td>None. Nothing allocates outside <code>init()</code>.</td></tr>
+</table>
+
+<h2>Design</h2>
+<p>The original firmware runs at fixed sample rates (from 31.25 kHz to 96 kHz), processes audio in blocks and depends on <code>stmlib</code>. In this library:</p>
+<ul>
+  <li><strong>Every component works at any sample rate.</strong> Constants that assumed one rate are recomputed in <code>init()</code>.</li>
+  <li><strong>Processing is per sample.</strong> Components that are costly to update (such as a 64-mode resonator) recompute their coefficients every few samples internally, as the originals did per block.</li>
+  <li><strong>The only dependency is the C++11 standard library.</strong> There is no stmlib and no Rack header, so every component can be tested outside Rack.</li>
+  <li><strong>All maths is <code>float</code>.</strong> The fixed-point code from the older modules is ported to float.</li>
+</ul>
+
+<h2>Licence</h2>
+<p>MIT, as is the original STM32 firmware code by Emilie Gillet. Derived files keep her copyright notice.</p>
+
+<h2>Components</h2>
+<table>
+<tr><th>Category</th><th>Contents</th></tr>
+<tr><td><a href="core.html">Core</a></td><td>Maths helpers, units, random numbers, lookup tables</td></tr>
+<tr><td><a href="physical.html">Physical models</a></td><td>ModalResonator, String, Tube, Plucker</td></tr>
+<tr><td><a href="dynamics.html">Dynamics</a></td><td>LowPassGate, Vactrol, Compressor, Follower</td></tr>
+<tr><td><a href="fx.html">Effects</a></td><td>Reverb, Diffuser, Chorus, Ensemble, PitchShifter, Overdrive, Wavefolder, Decimator, Limiter, FxEngine</td></tr>
+<tr><td><a href="drums.html">Drums</a></td><td>AnalogKick, AnalogSnare, SynthKick, SynthSnare, HiHat, FmDrum</td></tr>
+<tr><td><a href="mod.html">Modulation</a></td><td>Envelope, Slope, ClockToRamp, BouncingBall, Lorenz, Quantizer, HysteresisQuantizer, Lag, RandomSequence</td></tr>
+<tr><td><a href="osc.html">Oscillators</a></td><td>VariableShapeOscillator, FormantOscillator, ZOscillator, VosimOscillator, GrainletOscillator, HarmonicOscillator, StringSynthOscillator, WavetableOscillator</td></tr>
+<tr><td><a href="noise.html">Noise</a></td><td>Dust, ClockedNoise, SmoothRandom, Particle</td></tr>
+<tr><td><a href="spectral.html">Spectral</a></td><td>Xmod, Hilbert, VowelFilter, Vocoder, FmOperators, OnsetDetector</td></tr>
+<tr><td><a href="plumbing.html">Plumbing</a></td><td>Svf, OnePole, DcBlocker, DelayLine, BasicOscillator, SineOscillator, CosineOscillator, PolyBLEP</td></tr>
+</table>
+
+</main>
+</div>
+</body>
+</html>

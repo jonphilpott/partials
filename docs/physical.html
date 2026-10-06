@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Physical models · mutablelib</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="page">
+<nav>
+  <div class="title">mutablelib</div>
+  <a href="index.html">Overview</a>
+  <a href="setup.html">Getting started</a>
+  <a href="tutorial.html">Tutorial</a>
+  <a href="core.html">Core</a>
+  <a href="physical.html" class="here">Physical models</a>
+  <a href="dynamics.html">Dynamics</a>
+  <a href="fx.html">Effects</a>
+  <a href="drums.html">Drums</a>
+  <a href="mod.html">Modulation</a>
+  <a href="osc.html">Oscillators</a>
+  <a href="noise.html">Noise</a>
+  <a href="spectral.html">Spectral</a>
+  <a href="plumbing.html">Plumbing</a>
+</nav>
+<main>
+
+<h1>Physical models</h1>
+<p class="lede">Resonating objects you excite with a signal: strikes, plucks, noise, breath or any audio.</p>
+
+<p>A physical model is two parts: an <strong>exciter</strong> that puts energy in, and a <strong>resonator</strong> that rings. The exciter decides the attack (a soft mallet, a hard pick, a bow); the resonator decides pitch, tone and decay.</p>
+<ul>
+  <li><strong>Resonators:</strong> <a href="#physical-modal_resonator">ModalResonator</a> and <a href="#physical-string">String</a>.</li>
+  <li><strong>Exciters:</strong> the <a href="#physical-plucker">Plucker</a>, or any short sound such as a click, a burst of noise, a drum hit, or audio from another module.</li>
+  <li><strong>Both in one:</strong> the <a href="#physical-tube">Tube</a> is excited by breath noise.</li>
+</ul>
+<p>Two tips apply to all of them:</p>
+<ul>
+  <li>Resonator outputs can carry a little DC. Follow them with a <a href="plumbing.html#filter-dc_blocker">DcBlocker</a>.</li>
+  <li>Use zero-mean excitation. Noise, a click followed by its negative, or the Plucker all work; a one-sided pulse leaves an offset that rings away slowly.</li>
+</ul>
+
+<!-- ===================================================================== -->
+<h2 id="physical-modal_resonator">ModalResonator</h2>
+<p class="origin"><code>#include "ml/physical/modal_resonator.h"</code> · from Rings, with Elements' bowed modes</p>
+<p>The sound of a struck or bowed object (a string, a wooden or metal bar, a plate, a bell or a glass), made from up to 64 tuned band-pass filters. It is the core of Rings' modal mode.</p>
+<p><strong>How it works.</strong> Real objects vibrate in several patterns at once, called modes, each at its own frequency and each decaying at its own rate. Here each mode is one resonant filter:</p>
+<ul>
+  <li><code>structure</code> sets where the partials sit. A string's are evenly spaced (harmonic); a bar's stretch further apart; a bell's crowd together.</li>
+  <li><code>damping</code> sets how long everything rings.</li>
+  <li><code>brightness</code> sets how much faster the high modes die.</li>
+  <li><code>position</code> mimics where the object is struck. Striking a string in the middle can't excite modes that have a still point (node) there, so even harmonics vanish at 0.5.</li>
+</ul>
+<table>
+<tr><th>Setter</th><th>Range</th><th>Effect</th></tr>
+<tr><td><code>setFrequency(hz)</code></td><td>Hz</td><td>Fundamental pitch.</td></tr>
+<tr><td><code>setStructure(x)</code></td><td>0..1</td><td>Below 0.25 bell-like; 0.25–0.3 harmonic string; higher values stiffer bars and plates; near 1 metallic.</td></tr>
+<tr><td><code>setBrightness(x)</code></td><td>0..1</td><td>How long high partials ring compared with low ones.</td></tr>
+<tr><td><code>setDamping(x)</code></td><td>0..1</td><td>Overall decay, from a thud (0) to about 30 seconds (1).</td></tr>
+<tr><td><code>setPosition(x)</code></td><td>0..1</td><td>Strike point; 0.5 is the middle.</td></tr>
+<tr><td><code>setModes(n)</code></td><td>1..64</td><td>Number of modes. Fewer is cheaper and plainer; 1 gives a pure resonant filter.</td></tr>
+<tr><td><code>setBowedModes(on)</code></td><td>bool</td><td>Adds Elements' 8 bowed waveguide modes, driven by the second argument of <code>process()</code>. Off by default.</td></tr>
+<tr><td><code>setSideLfo(hz, offset)</code></td><td>Hz, 0..1</td><td>The slow pickup sweep behind <code>side()</code>. Default 0.5 Hz and 0.1.</td></tr>
+</table>
+<table>
+<tr><th>Output</th><th>Meaning</th></tr>
+<tr><td><code>process(in, bow = 0)</code></td><td>Returns the sum of all modes. <code>in</code> is the excitation; <code>bow</code> (0..1) is the bow pressure when bowed modes are on.</td></tr>
+<tr><td><code>odd()</code>, <code>even()</code></td><td>Odd- and even-numbered modes separately, as on Rings' two outputs. Panned left and right they give a wide stereo image.</td></tr>
+<tr><td><code>side()</code></td><td>A slowly moving stereo difference signal: use <code>out + side</code> and <code>out − side</code> for left and right.</td></tr>
+</table>
+<p><strong>Cost:</strong> one filter per mode per sample, so about 64 filters at full resolution. Coefficients update 2000 times a second, and position changes are ramped to avoid zipper noise. For many voices, lower <code>setModes()</code>.</p>
+<pre><code>// Struck object: a trigger "hits" it, audio input excites it continuously
+ml::ModalResonator res;
+ml::DcBlocker dc;
+dsp::SchmittTrigger strike;
+
+void onSampleRateChange(const SampleRateChangeEvent&amp; e) override {
+    res.init(e.sampleRate);
+    dc.init(e.sampleRate);
+}
+
+void process(const ProcessArgs&amp; args) override {
+    res.setFrequency(ml::voltToHz(params[PITCH].getValue() + inputs[VOCT].getVoltage()));
+    res.setStructure(params[STRUCTURE].getValue());
+    res.setBrightness(params[BRIGHTNESS].getValue());
+    res.setDamping(params[DAMPING].getValue());
+    res.setPosition(params[POSITION].getValue());
+
+    float in = inputs[IN].getVoltage() / 5.f;
+    if (strike.process(inputs[TRIG].getVoltage())) in += 1.f;   // one-sample click
+    res.process(in);
+
+    // Rings-style stereo: odd modes left, even modes right
+    outputs[LEFT].setVoltage(5.f * res.odd());
+    outputs[RIGHT].setVoltage(5.f * res.even());
+}</code></pre>
+<pre><code>// Bowed glass: steady bow pressure from a CV, Elements' bowed modes on
+// once, in onSampleRateChange: res.init(sr); res.setBowedModes(true);
+res.setStructure(0.6f);
+res.setDamping(0.9f);
+float bow = ml::clamp(inputs[BOW].getVoltage() / 10.f, 0.f, 1.f);
+float out = res.process(0.f, bow);</code></pre>
+<pre><code>// Polyphonic: one resonator per channel
+ml::ModalResonator voices[16];
+// onSampleRateChange: for (auto&amp; v : voices) v.init(e.sampleRate);
+int channels = std::max(1, inputs[VOCT].getChannels());
+for (int c = 0; c &lt; channels; ++c) {
+    voices[c].setModes(24);   // cheaper per voice
+    voices[c].setFrequency(ml::voltToHz(inputs[VOCT].getPolyVoltage(c)));
+    outputs[OUT].setVoltage(5.f * voices[c].process(inputs[IN].getPolyVoltage(c) / 5.f), c);
+}
+outputs[OUT].setChannels(channels);</code></pre>
+
+<!-- ===================================================================== -->
+<h2 id="physical-string">String</h2>
+<p class="origin"><code>#include "ml/physical/string.h"</code> · from Elements and Rings</p>
+<p>A plucked or struck string using the Karplus-Strong method, extended with dispersion: it covers plain strings, stiff piano-like strings, rattling strings and a buzzing sitar-style bridge.</p>
+<p><strong>How it works.</strong> A delay line exactly one period long holds the travelling wave. Each trip round the loop, the wave passes through two filters and comes back slightly quieter and duller, so any excitation repeats at the string's pitch and dies away like a real string.</p>
+<ul>
+  <li><code>damping</code> sets the loop's loss.</li>
+  <li><code>brightness</code> sets its low-pass.</li>
+  <li><code>dispersion</code> adds either an all-pass filter, which makes high harmonics travel slower as in a stiff string, or a nonlinear "curved bridge" that buzzes.</li>
+</ul>
+<table>
+<tr><th>Setter</th><th>Range</th><th>Effect</th></tr>
+<tr><td><code>setFrequency(hz)</code></td><td>Hz</td><td>Pitch. Below about 16 Hz the loop is resampled, which sounds rough.</td></tr>
+<tr><td><code>setDispersion(x)</code></td><td>0..1</td><td>0.5 is a plain string. Above it, stiffer and inharmonic, rattling near 1. Below it, a buzzing curved bridge.</td></tr>
+<tr><td><code>setBrightness(x)</code></td><td>0..1</td><td>How quickly high harmonics die.</td></tr>
+<tr><td><code>setDamping(x)</code></td><td>0..1</td><td>Decay time; from 0.95 it fades into infinite sustain.</td></tr>
+<tr><td><code>setPosition(x)</code></td><td>0..1</td><td>Position of the second pickup, read with <code>aux()</code>.</td></tr>
+<tr><td><code>process(in)</code></td><td></td><td>Returns the string output; <code>aux()</code> then holds the second pickup's sample.</td></tr>
+<tr><td><code>seed(s)</code></td><td></td><td>Seeds the rattle noise, for repeatable output.</td></tr>
+</table>
+<p><strong>Cost:</strong> light: one delay line and a few filters. Use it freely for polyphony.</p>
+<pre><code>// Plucked string with a trigger input
+ml::Plucker pluck;
+ml::String string;
+dsp::SchmittTrigger trig;
+
+void onSampleRateChange(const SampleRateChangeEvent&amp; e) override {
+    pluck.init(e.sampleRate);
+    string.init(e.sampleRate);
+}
+
+void process(const ProcessArgs&amp; args) override {
+    float hz = ml::voltToHz(params[PITCH].getValue() + inputs[VOCT].getVoltage());
+    pluck.setFrequency(hz);
+    pluck.setCutoff(hz * 16.f);
+    string.setFrequency(hz);
+    string.setDispersion(params[DISPERSION].getValue());
+    string.setBrightness(params[BRIGHTNESS].getValue());
+    string.setDamping(params[DAMPING].getValue());
+    string.setPosition(params[POSITION].getValue());
+
+    if (trig.process(inputs[TRIG].getVoltage())) pluck.trigger();
+    float out = string.process(pluck.process());
+    outputs[OUT].setVoltage(5.f * out);
+    outputs[PICKUP].setVoltage(5.f * string.aux());
+}</code></pre>
+<pre><code>// Sympathetic strings: one input, several strings tuned to a chord
+// (each init()ed in onSampleRateChange)
+ml::String strings[3];
+const float intervals[3] = {0.f, 7.f, 12.f};
+float out = 0.f;
+for (int i = 0; i &lt; 3; ++i) {
+    strings[i].setFrequency(hz * ml::semitonesToRatio(intervals[i]));
+    strings[i].setDamping(0.9f);
+    out += strings[i].process(in * 0.3f);
+}</code></pre>
+
+<!-- ===================================================================== -->
+<h2 id="physical-tube">Tube</h2>
+<p class="origin"><code>#include "ml/physical/tube.h"</code> · from Elements</p>
+<p>A reed and air column. Blow noise into it and it gives a reedy, clarinet-like tone with mostly odd harmonics.</p>
+<p><strong>How it works.</strong> A delay line stands in for the air column. At the mouthpiece, a simple reed curve compares the breath pressure with the wave coming back down the tube. The reed opens and chokes in step with that wave, which keeps the oscillation going. The loop's behaviour depends on the sample rate, so the model always runs at Elements' 32 kHz internally and is interpolated to the host rate.</p>
+<table>
+<tr><th>Call</th><th>Range</th><th>Effect</th></tr>
+<tr><td><code>setFrequency(hz)</code></td><td>Hz</td><td>Sounding pitch.</td></tr>
+<tr><td><code>setDamping(x)</code></td><td>0..1</td><td>Higher values soften and mute the breath.</td></tr>
+<tr><td><code>setTimbre(x)</code></td><td>0..1</td><td>Brightness.</td></tr>
+<tr><td><code>process(breath, envelope)</code></td><td>±1, 0..1</td><td><code>breath</code>: the air (noise, or noise mixed with audio). <code>envelope</code>: blowing pressure, which also scales the output. Returns the tube sound.</td></tr>
+</table>
+<p><strong>Tips:</strong> a little breath noise (±0.1 to ±0.3) gives a natural tone; more sounds airy. The tube only sounds while <code>envelope</code> is above zero, so drive it from an envelope generator or a pressure CV.</p>
+<pre><code>ml::Tube tube;
+ml::Random rng;
+// onSampleRateChange: tube.init(e.sampleRate);
+
+void process(const ProcessArgs&amp; args) override {
+    tube.setFrequency(ml::voltToHz(inputs[VOCT].getVoltage()));
+    tube.setDamping(params[DAMPING].getValue());
+    tube.setTimbre(params[TIMBRE].getValue());
+    float breath = params[AIR].getValue() * rng.bipolar();
+    float pressure = ml::clamp(inputs[PRESSURE].getVoltage() / 10.f, 0.f, 1.f);
+    outputs[OUT].setVoltage(5.f * tube.process(breath, pressure));
+}</code></pre>
+
+<!-- ===================================================================== -->
+<h2 id="physical-plucker">Plucker</h2>
+<p class="origin"><code>#include "ml/physical/plucker.h"</code> · from Rings</p>
+<p>A short burst of noise shaped like a pick or finger: Rings' internal exciter. Feed it into a String or ModalResonator.</p>
+<p><strong>How it works.</strong> Each <code>trigger()</code> starts a white-noise burst lasting a fraction of one period of the note. The burst then goes through two filters:</p>
+<ul>
+  <li>a feedback comb filter, which shapes the spectrum the way the pluck point along a string does;</li>
+  <li>a low-pass, which sets how bright the pick is.</li>
+</ul>
+<table>
+<tr><th>Call</th><th>Range</th><th>Effect</th></tr>
+<tr><td><code>setFrequency(hz)</code></td><td>Hz</td><td>Pitch of the note being plucked; sets the burst length. Match it to the resonator.</td></tr>
+<tr><td><code>setCutoff(hz)</code></td><td>Hz</td><td>Burst brightness: a few times the note frequency sounds like a finger, 20–30 times like a hard pick.</td></tr>
+<tr><td><code>setPosition(x)</code></td><td>0..1</td><td>Pluck point: low values are near the bridge (bright, thin), high values longer and rounder.</td></tr>
+<tr><td><code>trigger()</code></td><td></td><td>Start a burst with the current settings.</td></tr>
+<tr><td><code>process()</code></td><td></td><td>Next sample of the burst (silence between bursts).</td></tr>
+<tr><td><code>seed(s)</code></td><td></td><td>Seeds the noise, for repeatable bursts.</td></tr>
+</table>
+<pre><code>ml::Plucker pluck;
+ml::ModalResonator res;
+dsp::SchmittTrigger trig;
+// onSampleRateChange: pluck.init(sr); res.init(sr);
+
+void process(const ProcessArgs&amp; args) override {
+    float hz = ml::voltToHz(inputs[VOCT].getVoltage());
+    float hardness = params[HARDNESS].getValue();          // 0 = finger, 1 = pick
+    pluck.setFrequency(hz);
+    pluck.setCutoff(hz * (2.f + 30.f * hardness));
+    pluck.setPosition(params[POSITION].getValue());
+    if (trig.process(inputs[TRIG].getVoltage())) pluck.trigger();
+
+    float burst = pluck.process();
+    outputs[EXCITER].setVoltage(5.f * burst);               // useful on its own too
+    res.setFrequency(hz);
+    outputs[OUT].setVoltage(5.f * res.process(burst));
+}</code></pre>
+
+</main>
+</div>
+</body>
+</html>

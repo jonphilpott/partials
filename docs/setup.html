@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Getting started · mutablelib</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="page">
+<nav>
+  <div class="title">mutablelib</div>
+  <a href="index.html">Overview</a>
+  <a href="setup.html" class="here">Getting started</a>
+  <a href="tutorial.html">Tutorial</a>
+  <a href="core.html">Core</a>
+  <a href="physical.html">Physical models</a>
+  <a href="dynamics.html">Dynamics</a>
+  <a href="fx.html">Effects</a>
+  <a href="drums.html">Drums</a>
+  <a href="mod.html">Modulation</a>
+  <a href="osc.html">Oscillators</a>
+  <a href="noise.html">Noise</a>
+  <a href="spectral.html">Spectral</a>
+  <a href="plumbing.html">Plumbing</a>
+</nav>
+<main>
+
+<h1>Getting started</h1>
+<p class="lede">Set up a VCV Rack plugin build environment, build and install the example modules, then use the library in your own plugin.</p>
+
+<p>The steps:</p>
+<ol>
+  <li>Install a compiler and build tools.</li>
+  <li>Download the Rack SDK.</li>
+  <li>Build and install the examples.</li>
+  <li>Start your own plugin.</li>
+</ol>
+<p>The library itself needs nothing beyond a C++11 compiler; the toolchain and SDK are what Rack plugins need. These instructions follow the official <a href="https://vcvrack.com/manual/Building">VCV Rack build guide</a>; check there if anything has changed.</p>
+
+<h2>1. Install the build tools</h2>
+
+<h3>macOS</h3>
+<ol>
+  <li>Install Apple's command-line tools, which include the compiler:
+<pre><code>xcode-select --install</code></pre></li>
+  <li>Install <a href="https://brew.sh">Homebrew</a>, then the tools Rack's build system uses:
+<pre><code>brew install git wget cmake autoconf automake libtool jq python zstd pkg-config</code></pre></li>
+</ol>
+
+<h3>Windows</h3>
+<p>Rack plugins are built with MinGW, using the <a href="https://www.msys2.org">MSYS2</a> environment.</p>
+<ol>
+  <li>Install MSYS2.</li>
+  <li>Open the <strong>MinGW 64-bit</strong> shell from the Start menu. Not the default MSYS shell: it has the wrong compiler.</li>
+  <li>Update the package database:
+<pre><code>pacman -Syu</code></pre></li>
+  <li>Close and reopen the MinGW 64-bit shell, then install the tools:
+<pre><code>pacman -Syu git wget make tar unzip zip mingw-w64-x86_64-gcc mingw-w64-x86_64-gdb mingw-w64-x86_64-cmake autoconf automake libtool mingw-w64-x86_64-jq python zstd mingw-w64-x86_64-pkgconf</code></pre></li>
+</ol>
+<p>If builds are very slow or fail with permission errors, try pausing your antivirus.</p>
+
+<h3>Linux (Ubuntu, Debian)</h3>
+<pre><code>sudo apt install unzip git gdb curl cmake libx11-dev libglu1-mesa-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev zlib1g-dev libasound2-dev libgtk2.0-dev libgtk-3-dev libjack-jackd2-dev jq zstd libpulse-dev pkg-config autoconf libtool</code></pre>
+
+<h3>Linux (Arch)</h3>
+<pre><code>pacman -S git wget gcc gdb make cmake tar unzip zip curl jq python zstd libpulse pkgconf</code></pre>
+
+<h2>2. Download the Rack SDK</h2>
+<p>The SDK holds Rack's headers, its library to link against, and the shared Makefile (<code>plugin.mk</code>) that every plugin uses. Download the one for your computer from <a href="https://vcvrack.com/downloads/">vcvrack.com/downloads</a>, or with one of these commands (replace <code>2.6.4</code> with the latest version):</p>
+<table>
+<tr><th>Computer</th><th>Download</th></tr>
+<tr><td>Mac, Apple Silicon (M1 and later)</td><td><code>https://vcvrack.com/downloads/Rack-SDK-2.6.4-mac-arm64.zip</code></td></tr>
+<tr><td>Mac, Intel</td><td><code>https://vcvrack.com/downloads/Rack-SDK-2.6.4-mac-x64.zip</code></td></tr>
+<tr><td>Windows</td><td><code>https://vcvrack.com/downloads/Rack-SDK-2.6.4-win-x64.zip</code></td></tr>
+<tr><td>Linux</td><td><code>https://vcvrack.com/downloads/Rack-SDK-2.6.4-lin-x64.zip</code></td></tr>
+</table>
+<p>Unzip it anywhere and tell the build where it is with the <code>RACK_DIR</code> environment variable:</p>
+<pre><code>cd ~/git
+curl -LO https://vcvrack.com/downloads/Rack-SDK-2.6.4-mac-arm64.zip
+unzip Rack-SDK-2.6.4-mac-arm64.zip           # creates ~/git/Rack-SDK
+export RACK_DIR=~/git/Rack-SDK</code></pre>
+<p>Add the <code>export</code> line to your <code>~/.zshrc</code> (macOS) or <code>~/.bashrc</code> (Linux and MSYS2) so it is set in every new shell.</p>
+<p>Use an SDK version no newer than the Rack you run: plugins built with SDK 2.6 need Rack 2.6 or later. Rack 2 plugins don't load in Rack 1, and vice versa.</p>
+
+<h2>3. Build and install the examples</h2>
+<p>The <code>examples/rack-plugin</code> folder is a complete Rack plugin with six demo modules, one per library area:</p>
+<table>
+<tr><th>Module</th><th>Built from</th></tr>
+<tr><td>Strike</td><td>Plucker → ModalResonator → LowPassGate</td></tr>
+<tr><td>Haze</td><td>Overdrive → Ensemble → Diffuser → Reverb → Limiter</td></tr>
+<tr><td>Kit</td><td>AnalogKick, AnalogSnare, HiHat</td></tr>
+<tr><td>Drift</td><td>ClockToRamp, RandomSequence, Lag, Quantizer, Slope</td></tr>
+<tr><td>Palette</td><td>Six oscillators behind one set of controls</td></tr>
+<tr><td>Bridge</td><td>Xmod, Hilbert frequency shifter, Vocoder</td></tr>
+</table>
+<p>From the repository's root:</p>
+<pre><code>cd examples/rack-plugin
+make             # build plugin.dylib / plugin.dll / plugin.so
+make install     # build, package and install into Rack's user folder</code></pre>
+<p>Restart Rack. The modules appear in the module browser under the brand <strong>mutablelib</strong>.</p>
+<p><code>make install</code> copies the packaged plugin into the <code>plugins-&lt;os&gt;-&lt;cpu&gt;</code> folder inside Rack's user folder. Rack unpacks it on its next start. Rack can open the user folder for you from <em>Help → Open user folder</em>.</p>
+<table>
+<tr><th>System</th><th>Plugins folder</th></tr>
+<tr><td>macOS</td><td><code>~/Library/Application Support/Rack2/plugins-mac-arm64</code> (or <code>-mac-x64</code>)</td></tr>
+<tr><td>Windows</td><td><code>%LOCALAPPDATA%\Rack2\plugins-win-x64</code></td></tr>
+<tr><td>Linux</td><td><code>~/.local/share/Rack2/plugins-lin-x64</code> (or under <code>$XDG_DATA_HOME</code>)</td></tr>
+</table>
+<p>Other useful targets:</p>
+<table>
+<tr><th>Command</th><th>Does</th></tr>
+<tr><td><code>make dist</code></td><td>Builds a distributable package: <code>dist/MutablelibDemo-2.0.0-&lt;os&gt;-&lt;cpu&gt;.vcvplugin</code>.</td></tr>
+<tr><td><code>make clean</code></td><td>Removes build files.</td></tr>
+<tr><td><code>make -j8</code></td><td>Compiles 8 files at once.</td></tr>
+</table>
+<p><code>examples/tutorial-plugin</code> holds the finished module from the <a href="tutorial.html">tutorial</a>, and builds the same way.</p>
+<p>The example's <code>Makefile</code> points at the library with a relative path (<code>FLAGS += -I../../include</code>). If you move the example elsewhere, change that path to wherever <code>mutablelib/include</code> lives.</p>
+
+<h3>If it doesn't build</h3>
+<ul>
+  <li><strong>"No rule to make target …/plugin.mk":</strong> <code>RACK_DIR</code> isn't set, or points at the wrong folder. <code>ls $RACK_DIR/plugin.mk</code> should list the file. You can also pass it directly: <code>make RACK_DIR=~/git/Rack-SDK</code>.</li>
+  <li><strong>"ml/…h: No such file":</strong> the include path in the Makefile doesn't reach <code>mutablelib/include</code>.</li>
+  <li><strong>On Windows, compiler or linker not found:</strong> you are in the MSYS shell rather than the MinGW 64-bit shell.</li>
+  <li><strong>The module doesn't appear in Rack:</strong> check Rack's log (<code>log.txt</code> in the user folder). An "incompatible" message means the SDK is newer than your Rack.</li>
+</ul>
+
+<h2>4. Use the library in your own plugin</h2>
+<p>The <a href="tutorial.html">tutorial</a> walks through these steps in detail, building a complete module. In short:</p>
+<ol>
+  <li>Create a plugin skeleton with the SDK's helper, answering its questions:
+<pre><code>cd ~/git
+$RACK_DIR/helper.py createplugin MyPlugin
+cd MyPlugin</code></pre></li>
+  <li>Draw a panel (an SVG in <code>res/</code>) and generate a module from it:
+<pre><code>$RACK_DIR/helper.py createmodule MyModule res/MyModule.svg src/MyModule.cpp</code></pre></li>
+  <li>Point the plugin's <code>Makefile</code> at mutablelib by adding one line before <code>include $(RACK_DIR)/plugin.mk</code>. The library is header-only, so there is nothing else to build or link.
+<pre><code># Makefile
+FLAGS += -I../mutablelib/include</code></pre></li>
+  <li>Include components and use them. The <a href="index.html">overview</a> shows the pattern every component follows:
+<pre><code>#include "plugin.hpp"
+#include "ml/physical/string.h"
+
+struct MyModule : Module {
+    ml::String string;
+
+    void onSampleRateChange(const SampleRateChangeEvent&amp; e) override {
+        string.init(e.sampleRate);
+    }
+
+    void process(const ProcessArgs&amp; args) override {
+        string.setFrequency(ml::voltToHz(inputs[VOCT_INPUT].getVoltage()));
+        outputs[OUT_OUTPUT].setVoltage(5.f * string.process(inputs[IN_INPUT].getVoltage() / 5.f));
+    }
+};</code></pre></li>
+  <li>Build and install with <code>make install</code>, as for the examples.</li>
+</ol>
+<p>Instead of a relative path, you can keep mutablelib inside your plugin's repository, for example as a git submodule:</p>
+<pre><code>git submodule add &lt;mutablelib repository URL&gt; dep/mutablelib
+# Makefile
+FLAGS += -Idep/mutablelib/include</code></pre>
+<p>If you publish a plugin, keep the library's <code>LICENSE</code> file with it: it is MIT-licensed, and the notice credits Emilie Gillet, whose code it is derived from.</p>
+
+<h2>5. Run the library's tests (optional)</h2>
+<p>The tests need only a C++ compiler; Rack and the SDK aren't involved.</p>
+<pre><code>cd tests
+make check</code></pre>
+<p>This builds and runs every test program and checks that the docs cover every component. Most tests also write WAV files into <code>tests/build/</code> for listening.</p>
+<p>The golden tests in <code>tests/golden</code> compile Gillet's original code next to the library and compare their outputs. They need her <a href="https://github.com/pichenettes/eurorack">eurorack</a> repository and its <code>stmlib</code> submodule:</p>
+<pre><code>git clone https://github.com/pichenettes/eurorack.git ~/git/eurorack
+cd ~/git/eurorack
+git submodule update --init stmlib
+
+cd /path/to/mutablelib/tests/golden
+make check EURORACK=~/git/eurorack</code></pre>
+
+</main>
+</div>
+</body>
+</html>

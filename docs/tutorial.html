@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tutorial · mutablelib</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="page">
+<nav>
+  <div class="title">mutablelib</div>
+  <a href="index.html">Overview</a>
+  <a href="setup.html">Getting started</a>
+  <a href="tutorial.html" class="here">Tutorial</a>
+  <a href="core.html">Core</a>
+  <a href="physical.html">Physical models</a>
+  <a href="dynamics.html">Dynamics</a>
+  <a href="fx.html">Effects</a>
+  <a href="drums.html">Drums</a>
+  <a href="mod.html">Modulation</a>
+  <a href="osc.html">Oscillators</a>
+  <a href="noise.html">Noise</a>
+  <a href="spectral.html">Spectral</a>
+  <a href="plumbing.html">Plumbing</a>
+</nav>
+<main>
+
+<h1>Tutorial: your first module</h1>
+<p class="lede">Build a VCV Rack module from scratch with mutablelib: a sawtooth oscillator into a low-pass filter, with knobs for the oscillator's frequency and the filter's cutoff.</p>
+
+<p>By the end you will have a working module in Rack and know the pattern every mutablelib module follows. It takes about 20 minutes. The finished plugin is in <code>examples/tutorial-plugin</code> if you want to compare.</p>
+<p><strong>Before you start:</strong> install the build tools and the Rack SDK, and set <code>RACK_DIR</code>, as described in <a href="setup.html">Getting started</a> (steps 1 and 2). Check with:</p>
+<pre><code>ls $RACK_DIR/helper.py</code></pre>
+
+<h2>The plan</h2>
+<pre><code>  [FREQUENCY knob]          [CUTOFF knob]
+         |                        |
+         v                        v
+   BasicOscillator  -------&gt;    Svf      -------&gt;  OUT jack
+   (sawtooth)             (low-pass)</code></pre>
+<p>Two mutablelib components do the work:</p>
+<ul>
+  <li><a href="plumbing.html#osc-basic"><code>ml::BasicOscillator</code></a>: an alias-free sawtooth.</li>
+  <li><a href="plumbing.html#filter-svf"><code>ml::Svf</code></a>: a state-variable filter, used here as a low-pass.</li>
+</ul>
+<p>Our code reads the knobs, passes their values to the components, and sends the result to the output, once per sample.</p>
+
+<!-- ===================================================================== -->
+<h2>Step 1: create the plugin</h2>
+<p>A Rack <em>plugin</em> is a package of one or more <em>modules</em>. The SDK's helper script creates an empty one. From the folder where you keep your projects:</p>
+<pre><code>$RACK_DIR/helper.py createplugin MyFirstPlugin</code></pre>
+<p>It asks a few questions. Press Enter to accept a default:</p>
+<pre><code>Plugin name [MyFirstPlugin]: My First Plugin
+Version [2.0.0]:
+License (if open-source, use license identifier from https://spdx.org/licenses/) [proprietary]: MIT
+Brand (prefix for all module names) [My First Plugin]: MyBrand
+Author []: Your Name
+...                          (the rest are optional: press Enter)</code></pre>
+<p>This creates a <code>MyFirstPlugin</code> folder:</p>
+<pre><code>MyFirstPlugin/
+  Makefile        how to build the plugin
+  plugin.json     the plugin's name, version and list of modules
+  res/            panels and other resources
+  src/
+    plugin.hpp    declarations shared by all modules
+    plugin.cpp    registers the modules with Rack</code></pre>
+
+<!-- ===================================================================== -->
+<h2>Step 2: add mutablelib</h2>
+<p>mutablelib is header-only, so the plugin only needs to know where its <code>include</code> folder is. Put a copy of the library inside the plugin, in a <code>dep</code> (dependencies) folder:</p>
+<pre><code>cd MyFirstPlugin
+mkdir dep
+cp -r /path/to/mutablelib dep/mutablelib
+# or, if your plugin is a git repository, add it as a submodule:
+# git submodule add &lt;mutablelib repository URL&gt; dep/mutablelib</code></pre>
+<p>Then open <code>Makefile</code> and change the empty <code>FLAGS +=</code> line to:</p>
+<pre><code># mutablelib is header-only: adding its include folder is all it needs.
+FLAGS += -Idep/mutablelib/include</code></pre>
+<p><code>-I</code> adds a folder to the compiler's search path, so <code>#include "ml/osc/basic.h"</code> finds <code>dep/mutablelib/include/ml/osc/basic.h</code>. There's nothing to compile or link separately.</p>
+
+<!-- ===================================================================== -->
+<h2>Step 3: draw the panel</h2>
+<p>A module's panel is an SVG image. It also tells the helper where the knobs and jacks go. Any shape inside a layer called <code>components</code> marks a control, by its colour:</p>
+<table>
+<tr><th>Colour</th><th>Becomes</th></tr>
+<tr><td>red <code>#ff0000</code></td><td>a knob or switch (a <em>param</em>)</td></tr>
+<tr><td>green <code>#00ff00</code></td><td>an input jack</td></tr>
+<tr><td>blue <code>#0000ff</code></td><td>an output jack</td></tr>
+<tr><td>magenta <code>#ff00ff</code></td><td>a light</td></tr>
+</table>
+<p>The shape's <code>id</code> becomes the control's name in the code. Save this as <code>res/SawFilter.svg</code>:</p>
+<pre><code>&lt;svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     width="30.48mm" height="128.5mm" viewBox="0 0 30.48 128.5"&gt;
+  &lt;!-- The panel: 6 HP wide (6 x 5.08 mm) and 128.5 mm tall, the Eurorack size. --&gt;
+  &lt;rect width="30.48" height="128.5" fill="#e6e4dc"/&gt;
+  &lt;rect width="30.48" height="12" fill="#2b2b2b"/&gt;
+  &lt;rect x="4" y="98" width="22.48" height="20" rx="2" fill="#2b2b2b"/&gt;
+
+  &lt;!-- Where the knobs and jack go. Rack's helper reads this layer to write
+       the C++ code; it is hidden, so Rack doesn't draw it.
+       Red = knob (param), green = input, blue = output. --&gt;
+  &lt;g id="components" inkscape:label="components" inkscape:groupmode="layer" style="display:none"&gt;
+    &lt;circle id="FREQ" cx="15.24" cy="38" r="4" fill="#ff0000"/&gt;
+    &lt;circle id="CUTOFF" cx="15.24" cy="68" r="4" fill="#ff0000"/&gt;
+    &lt;circle id="OUT" cx="15.24" cy="108" r="4" fill="#0000ff"/&gt;
+  &lt;/g&gt;
+&lt;/svg&gt;</code></pre>
+<p>Panel widths are multiples of 5.08 mm (one "HP"); this one is 6 HP. The components layer is hidden (<code>display:none</code>) so Rack draws the real knobs on top, not the coloured circles.</p>
+<p>Rack can't draw SVG <code>&lt;text&gt;</code>. To label the knobs, draw the labels as shapes, or in <a href="https://inkscape.org">Inkscape</a> write them as text and use <em>Path → Object to Path</em> before saving. This tutorial skips labels.</p>
+
+<!-- ===================================================================== -->
+<h2>Step 4: generate the module</h2>
+<p>The helper reads the panel and writes a module source file:</p>
+<pre><code>$RACK_DIR/helper.py createmodule SawFilter res/SawFilter.svg src/SawFilter.cpp</code></pre>
+<p>It asks for a name, description and tags (for example <code>Saw Filter</code>, a one-line description, and <code>Oscillator, Filter</code>), adds the module to <code>plugin.json</code>, and reports what it found:</p>
+<pre><code>Found 2 params, 0 inputs, 1 outputs, 0 lights, and 0 custom widgets in "components" layer.
+
+To enable the module, add
+
+	extern Model* modelSawFilter;
+
+to plugin.hpp, and add
+
+	p->addModel(modelSawFilter);
+
+to the init() function in plugin.cpp.
+Source file generated at src/SawFilter.cpp</code></pre>
+<p>Do what it says. In <code>src/plugin.hpp</code>, add the declaration at the end:</p>
+<pre><code>extern Model* modelSawFilter;</code></pre>
+<p>In <code>src/plugin.cpp</code>, inside <code>init()</code>:</p>
+<pre><code>p->addModel(modelSawFilter);</code></pre>
+<p>The generated <code>src/SawFilter.cpp</code> already compiles: it has the panel, two knobs and the jack, but makes no sound. It contains two parts:</p>
+<ul>
+  <li><strong><code>struct SawFilter : Module</code></strong> is the sound engine. Its enums give each control a number: <code>FREQ_PARAM</code> and <code>CUTOFF_PARAM</code> come from the panel ids. <code>process()</code> is where the audio happens.</li>
+  <li><strong><code>struct SawFilterWidget : ModuleWidget</code></strong> is what you see: the panel, screws, knobs and jack, placed where the panel's circles were.</li>
+</ul>
+
+<!-- ===================================================================== -->
+<h2>Step 5: write the sound</h2>
+<p>Now fill in the module. The changes are all inside <code>struct SawFilter</code>; the widget stays as generated.</p>
+
+<h3>5a. Include the components</h3>
+<p>At the top of <code>src/SawFilter.cpp</code>, after <code>#include "plugin.hpp"</code>:</p>
+<pre><code>#include "ml/core/units.h"    // voltToHz(), kFreqC4
+#include "ml/filter/svf.h"     // ml::Svf
+#include "ml/osc/basic.h"      // ml::BasicOscillator</code></pre>
+
+<h3>5b. Add them as members</h3>
+<p>Inside <code>struct SawFilter</code>, after the enums. They are ordinary member variables: no <code>new</code>, no pointers.</p>
+<pre><code>	ml::BasicOscillator oscillator;
+	ml::Svf filter;</code></pre>
+
+<h3>5c. Configure the knobs</h3>
+<p>Replace the two generated <code>configParam</code> lines in the constructor. Their arguments are: control, minimum, maximum, default, name, unit, then two numbers for how Rack <em>displays</em> the value (<code>multiplier × base<sup>value</sup></code>), so the tooltip shows Hz:</p>
+<pre><code>	SawFilter() {
+		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
+		// Frequency knob: -4..+4 octaves around C4. Rack shows it in Hz:
+		// 261.63 * 2^value, from 16 Hz to 4186 Hz.
+		configParam(FREQ_PARAM, -4.f, 4.f, 0.f, "Frequency", " Hz", 2.f, ml::kFreqC4);
+		// Cutoff knob: 0..1 mapped exponentially to 20 Hz..20 kHz. Rack
+		// shows it in Hz: 20 * 1000^value.
+		configParam(CUTOFF_PARAM, 0.f, 1.f, 0.5f, "Cutoff", " Hz", 1000.f, 20.f);
+		configOutput(OUT_OUTPUT, "Audio");
+
+		oscillator.setShape(ml::BasicOscillator::SAW);
+	}</code></pre>
+<p>Both knobs are <em>exponential</em>: each step multiplies the frequency rather than adding to it. That matches how we hear pitch, where every octave sounds the same size, so the knobs feel even across their range.</p>
+
+<h3>5d. Initialise at the right sample rate</h3>
+<p>Every mutablelib component needs <code>init(sampleRate)</code> before use. Rack tells a module the sample rate through <code>onSampleRateChange</code>. It is called when the module is added and whenever you change the engine's sample rate, so it is the one place you need. Add it to <code>struct SawFilter</code>:</p>
+<pre><code>	// Called when the module is added and whenever the sample rate
+	// changes: the place to (re)initialise DSP components.
+	void onSampleRateChange(const SampleRateChangeEvent&amp; e) override {
+		oscillator.init(e.sampleRate);
+		filter.init(e.sampleRate);
+	}</code></pre>
+
+<h3>5e. Process each sample</h3>
+<p>Replace the empty <code>process()</code>. Rack calls it once per sample, 48,000 times a second at 48 kHz:</p>
+<pre><code>	// Called once per sample.
+	void process(const ProcessArgs&amp; args) override {
+		// 1. Read the knobs and convert them to Hz.
+		float frequency = ml::voltToHz(params[FREQ_PARAM].getValue());
+		float cutoff = 20.f * std::pow(1000.f, params[CUTOFF_PARAM].getValue());
+
+		// 2. Oscillator: one sample of an alias-free sawtooth, about +-1.
+		oscillator.setFrequency(frequency);
+		float saw = oscillator.process();
+
+		// 3. Filter: the saw through a 12 dB/octave low-pass. Q 1.0 adds a
+		// little resonance at the cutoff.
+		filter.setFrequency(cutoff, 1.f);
+		float filtered = filter.process(saw).lp;
+
+		// 4. Rack's audio level is +-5 V.
+		outputs[OUT_OUTPUT].setVoltage(5.f * filtered);
+	}</code></pre>
+<p>Line by line:</p>
+<ul>
+  <li><strong>Units.</strong> mutablelib works in Hz and ±1; Rack works in volts. <code>ml::voltToHz()</code> turns the frequency knob's octaves into Hz (0 is C4, 261.63 Hz, and each +1 doubles it). The cutoff uses the same formula as its display.</li>
+  <li><strong>Setters, then <code>process()</code>.</strong> Every component works this way: set the parameters, then call <code>process()</code> once per sample. Setting them every sample is fine and keeps the knobs responsive.</li>
+  <li><strong><code>filter.process(saw)</code></strong> returns all three outputs of the state-variable filter at once; <code>.lp</code> picks the low-pass. Try <code>.bp</code> (band-pass) or <code>.hp</code> (high-pass).</li>
+  <li><strong>Scaling.</strong> The final <code>5.f *</code> converts the library's ±1 to Rack's ±5 V audio standard.</li>
+</ul>
+<p>The complete file is in <code>examples/tutorial-plugin/src/SawFilter.cpp</code>.</p>
+
+<!-- ===================================================================== -->
+<h2>Step 6: build, install and play</h2>
+<pre><code>make install</code></pre>
+<p>This compiles the plugin, packages it and copies it into Rack's plugins folder. Then:</p>
+<ol>
+  <li>Restart Rack.</li>
+  <li>Right-click the rack, search for <strong>Saw Filter</strong> (brand <em>MyBrand</em>) and add it.</li>
+  <li>Patch <strong>OUT</strong> into an Audio module (or a mixer into one), and set the volume low first: a raw sawtooth is loud.</li>
+  <li>Turn <strong>FREQUENCY</strong> to change the pitch, and <strong>CUTOFF</strong> to sweep from a muffled hum (cutoff below the pitch) to a bright buzz (cutoff well above it). Hover over a knob to see its value in Hz.</li>
+</ol>
+<p>After changing the code, run <code>make install</code> again and restart Rack. If something doesn't build, see <em>If it doesn't build</em> in <a href="setup.html">Getting started</a>.</p>
+
+<!-- ===================================================================== -->
+<h2>Next steps</h2>
+<p>Each of these is a few lines, and each uses the same pattern: add a control to the panel's components layer, regenerate or edit the code, then read it in <code>process()</code>.</p>
+<ul>
+  <li><strong>A V/Oct input.</strong> Add a green circle with id <code>VOCT</code>, then add the input voltage to the knob before converting, so the module plays in tune from a sequencer:
+<pre><code>float frequency = ml::voltToHz(params[FREQ_PARAM].getValue() + inputs[VOCT_INPUT].getVoltage());</code></pre></li>
+  <li><strong>A resonance knob.</strong> Add a red circle with id <code>RES</code>, configured 0..1, and map it to Q:
+<pre><code>filter.setFrequency(cutoff, 0.5f + 15.f * params[RES_PARAM].getValue());</code></pre></li>
+  <li><strong>Cutoff CV.</strong> Treat a 0..10 V input as an extra 0..1 on the knob:
+<pre><code>float k = ml::clamp(params[CUTOFF_PARAM].getValue() + inputs[CUTOFF_INPUT].getVoltage() / 10.f, 0.f, 1.f);
+float cutoff = 20.f * std::pow(1000.f, k);</code></pre></li>
+  <li><strong>Other waveforms.</strong> <code>setShape(ml::BasicOscillator::SQUARE)</code>, or swap in a more unusual oscillator from the <a href="osc.html">Oscillators</a> page.</li>
+  <li><strong>An envelope.</strong> Add a gate input and an <a href="dynamics.html#dynamics-lpg">ml::LowPassGate</a> after the filter, and you have a complete voice.</li>
+</ul>
+<p>The example modules in <code>examples/rack-plugin</code> use the same pattern at a larger scale, combining several components each.</p>
+
+</main>
+</div>
+</body>
+</html>
