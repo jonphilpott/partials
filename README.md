@@ -1,8 +1,10 @@
-# MutableLib
+# Partials
 
-A library of reusable components ported from components used in Mutable Instrument's eurorack code (https://github.com/pichenettes/eurorack)
+A library of reusable DSP components ported from bits and pieces used in Mutable Instrument's eurorack code (https://github.com/pichenettes/eurorack)
 
-A pretty lazy Claude code project, *absolutely all credit goes to Emilie Gillet* (emilie.o.gillet@gmail.com) for this code - I simply asked claude to extract parts that would make sense as reusable components in order to make a general-purpose DSP library that could be used to build VCV rack modules. The library is designed to be `include-only` to make integration as simple as possible.
+A pretty lazy Claude code project, *absolutely all credit goes to Emilie Gillet* (emilie.o.gillet@gmail.com) for this code - I simply asked claude to extract parts that would make sense as reusable components in order to make a general-purpose DSP library that could be used to build VCV rack modules. The library is designed to be _"include-only"_ to make integration as simple as possible.
+
+It's possible this library may grow in the future to include other useful DSP snippets for writing VCV rack modules, or code ported from my puredata projects.
 
 # License 
 
