@@ -13,6 +13,7 @@
   <a href="index.html">Overview</a>
   <a href="setup.html">Getting started</a>
   <a href="tutorial.html" class="here">Tutorial</a>
+  <a href="toolkit.html">Toolkit</a>
   <a href="core.html">Core</a>
   <a href="physical.html">Physical models</a>
   <a href="dynamics.html">Dynamics</a>
@@ -84,7 +85,7 @@ FLAGS += -Idep/partials/include</code></pre>
 <p>A module's panel is an SVG image. It also tells the helper where the knobs and jacks go. Any shape inside a layer called <code>components</code> marks a control, by its colour:</p>
 <table>
 <tr><th>Colour</th><th>Becomes</th></tr>
-<tr><td>red <code>#ff0000</code></td><td>a knob or switch (a <em>param</em>)</td></tr>
+<tr><td>red <code>#ff0000</code></td><td>a knob, slider, switch or button (a <em>param</em>; you choose which in Step 4)</td></tr>
 <tr><td>green <code>#00ff00</code></td><td>an input jack</td></tr>
 <tr><td>blue <code>#0000ff</code></td><td>an output jack</td></tr>
 <tr><td>magenta <code>#ff00ff</code></td><td>a light</td></tr>
@@ -135,6 +136,32 @@ Source file generated at src/SawFilter.cpp</code></pre>
   <li><strong><code>struct SawFilter : Module</code></strong> is the sound engine. Its enums give each control a number: <code>FREQ_PARAM</code> and <code>CUTOFF_PARAM</code> come from the panel ids. <code>process()</code> is where the audio happens.</li>
   <li><strong><code>struct SawFilterWidget : ModuleWidget</code></strong> is what you see: the panel, screws, knobs and jack, placed where the panel's circles were.</li>
 </ul>
+
+<h3>Knobs, sliders and switches</h3>
+<p>The panel only says where a param goes, not what it looks like, so the helper makes every red shape a knob. You choose the control in the widget code, by the type in angle brackets:</p>
+<pre><code>addParam(createParamCentered&lt;RoundBlackKnob&gt;(mm2px(Vec(15.24, 38.0)), module, SawFilter::FREQ_PARAM));
+//                           ^^^^^^^^^^^^^^ the control's look and behaviour</code></pre>
+<p>Rack's built-in controls include:</p>
+<table>
+<tr><th>Control</th><th>Type</th><th>Configure with</th></tr>
+<tr><td>knob: small, normal, large</td><td><code>RoundSmallBlackKnob</code>, <code>RoundBlackKnob</code>, <code>RoundLargeBlackKnob</code>, <code>Trimpot</code></td><td><code>configParam</code></td></tr>
+<tr><td>stepped knob (whole numbers only)</td><td><code>RoundBlackSnapKnob</code></td><td><code>configParam</code>, or <code>configSwitch</code> to label each step</td></tr>
+<tr><td>slider</td><td><code>VCVSlider</code></td><td><code>configParam</code></td></tr>
+<tr><td>two- or three-way switch</td><td><code>CKSS</code>, <code>CKSSThree</code></td><td><code>configSwitch</code></td></tr>
+<tr><td>push button</td><td><code>VCVButton</code>, <code>TL1105</code></td><td><code>configButton</code></td></tr>
+</table>
+<p>The type and the <code>config…</code> call should match. <code>configSwitch</code> rounds the value to whole numbers and shows a label for each position in the tooltip. For example, a switch to choose the waveform (red circle id <code>SHAPE</code>):</p>
+<pre><code>// In the widget: a two-way toggle instead of a knob.
+addParam(createParamCentered&lt;CKSS&gt;(mm2px(Vec(15.24, 85.0)), module, SawFilter::SHAPE_PARAM));
+
+// In the constructor: 0 or 1, default 0, one label per position.
+configSwitch(SHAPE_PARAM, 0.f, 1.f, 0.f, "Shape", {"Saw", "Square"});
+
+// In process(): the value is exactly 0.f or 1.f.
+oscillator.setShape(params[SHAPE_PARAM].getValue() &gt; 0.5f
+                        ? pt::BasicOscillator::SQUARE
+                        : pt::BasicOscillator::SAW);</code></pre>
+<p>The red shape marks only the control's centre, so leave room on the panel for a tall slider. The full list of controls is in <code>$RACK_DIR/include/componentlibrary.hpp</code>. This tutorial keeps the two knobs.</p>
 
 <!-- ===================================================================== -->
 <h2>Step 5: write the sound</h2>

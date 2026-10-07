@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Toolkit · partials</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="page">
+<nav>
+  <div class="title">partials</div>
+  <a href="index.html">Overview</a>
+  <a href="setup.html">Getting started</a>
+  <a href="tutorial.html">Tutorial</a>
+  <a href="toolkit.html" class="here">Toolkit</a>
+  <a href="core.html">Core</a>
+  <a href="physical.html">Physical models</a>
+  <a href="dynamics.html">Dynamics</a>
+  <a href="fx.html">Effects</a>
+  <a href="drums.html">Drums</a>
+  <a href="mod.html">Modulation</a>
+  <a href="osc.html">Oscillators</a>
+  <a href="noise.html">Noise</a>
+  <a href="spectral.html">Spectral</a>
+  <a href="plumbing.html">Plumbing</a>
+</nav>
+<main>
+
+<h1>Toolkit</h1>
+<p class="lede">Common synth techniques, each built from a few partials components: recording and playing a sample, a basic synth voice, and a delay.</p>
+
+<p>Each example is the inside of a module: its members, <code>onSampleRateChange()</code> and <code>process()</code>. To use one, draw a panel with the controls listed, generate the module as in the <a href="tutorial.html">tutorial</a>, then paste the code into <code>struct</code> <em>YourModule</em><code> : Module</code>. Each id becomes <code>ID_PARAM</code>, <code>ID_INPUT</code> or <code>ID_OUTPUT</code> in the code. Use <code>configParam</code> for the knobs with the range given, and <code>configButton</code> for buttons.</p>
+
+<!-- ===================================================================== -->
+<h2 id="toolkit-sampler">Recording and playing a sample</h2>
+<p class="origin"><code>#include "pt/core/math.h"</code> · <code>#include &lt;vector&gt;</code></p>
+<p>Records an input into memory, then plays it back in a loop at any speed, including backwards. This is what Pure Data does with <code>tabwrite~</code> and <code>tabread4~</code>.</p>
+<p><strong>How it works.</strong> partials has no table class: a <code>std::vector&lt;float&gt;</code> is the table. Recording writes one sample per call and moves on. Playback moves a read position by <em>speed</em> samples per call. Because the speed need not be a whole number, the position usually falls between two samples, so <a href="core.html#core-math-interpolateHermite">interpolateHermite()</a> draws a smooth curve through the four nearest samples and reads the value in between.</p>
+<table>
+<tr><th>Panel id</th><th>Kind</th><th>Range</th></tr>
+<tr><td><code>RECORD</code></td><td>button (<code>VCVButton</code>)</td><td>held to record</td></tr>
+<tr><td><code>SPEED</code></td><td>knob</td><td>-2..2, default 1</td></tr>
+<tr><td><code>IN</code></td><td>input</td><td>audio</td></tr>
+<tr><td><code>OUT</code></td><td>output</td><td>audio</td></tr>
+</table>
+<pre><code>std::vector&lt;float&gt; table;   // the recording
+size_t length = 0;          // samples recorded so far
+float readPos = 1.f;        // playback position, in samples
+bool wasRecording = false;
+
+void onSampleRateChange(const SampleRateChangeEvent&amp; e) override {
+	// Room for 4 seconds. Allocate here, never in process(): asking for
+	// memory on the audio thread can take long enough to cause a dropout.
+	table.assign(size_t(4.f * e.sampleRate), 0.f);
+	length = 0;
+}
+
+void process(const ProcessArgs&amp; args) override {
+	// 1. Record (tabwrite~). Pressing the button starts a new recording
+	//    from the beginning; holding it keeps recording until the table is full.
+	bool recording = params[RECORD_PARAM].getValue() &gt; 0.5f;
+	if (recording &amp;&amp; !wasRecording) length = 0;
+	wasRecording = recording;
+	if (recording &amp;&amp; length &lt; table.size())
+		table[length++] = inputs[IN_INPUT].getVoltage();
+
+	// Hermite reads one sample before the position and two after,
+	// so playback needs at least 4 samples to work with.
+	if (length &lt; 4) {
+		outputs[OUT_OUTPUT].setVoltage(0.f);
+		return;
+	}
+
+	// 2. Move the read head. 1 = original speed, 0.5 = an octave down,
+	//    -1 = backwards. Keep it between 1 and length - 2 so all four
+	//    samples it reads exist, wrapping at either end to loop.
+	float start = 1.f, end = float(length - 2);
+	readPos += params[SPEED_PARAM].getValue();
+	if (readPos &gt;= end) readPos -= end - start;
+	if (readPos &lt; start) readPos += end - start;
+
+	// 3. Play back (tabread4~). size = 1 means readPos counts samples
+	//    rather than running 0..1.
+	outputs[OUT_OUTPUT].setVoltage(pt::interpolateHermite(table.data(), readPos, 1.f));
+}</code></pre>
+<p><strong>Notes.</strong></p>
+<ul>
+  <li>The table stores volts as they arrive, so playback needs no rescaling.</li>
+  <li>Pd's <code>tabread4~</code> uses a Lagrange curve rather than Hermite. Both read the same four samples and sound much alike, though Hermite rings a little less around sharp edges.</li>
+  <li>The loop jumps from end to start, which clicks unless the recording starts and ends near silence. To smooth it, fade the first and last few milliseconds of the recording, or crossfade between two read heads.</li>
+  <li>To play the sample at a pitch, set the speed from V/Oct: <code>speed = pt::semitonesToRatio(12.f * volts)</code>.</li>
+</ul>
+
+<!-- ===================================================================== -->
+<h2 id="toolkit-voice">A simple synth voice</h2>
+<p class="origin"><code>#include "pt/osc/basic.h"</code> · <code>"pt/filter/svf.h"</code> · <code>"pt/mod/envelope.h"</code> · <code>"pt/core/units.h"</code></p>
+<p>The classic subtractive voice: a bright oscillator, a low-pass filter to take some of the brightness away, and an envelope that shapes each note when a gate arrives.</p>
+<p><strong>How it works.</strong> The envelope does two jobs. It sets the volume, which makes this its own VCA, and it opens the filter. That way a note gets brighter as it gets louder and darker as it fades, the way a plucked string or a struck piano key does. The <code>ENV</code> knob sets how far the envelope opens the filter beyond the <code>CUTOFF</code> setting.</p>
+<table>
+<tr><th>Panel id</th><th>Kind</th><th>Range</th></tr>
+<tr><td><code>FREQ</code></td><td>knob</td><td>-4..4 octaves, default 0 (C4)</td></tr>
+<tr><td><code>CUTOFF</code></td><td>knob</td><td>0..1, default 0.3</td></tr>
+<tr><td><code>RES</code></td><td>knob</td><td>0..1, default 0.2</td></tr>
+<tr><td><code>ENV</code></td><td>knob</td><td>0..1, default 0.5</td></tr>
+<tr><td><code>ATTACK</code>, <code>DECAY</code>, <code>RELEASE</code></td><td>knobs</td><td>0..1, defaults 0, 0.4, 0.5</td></tr>
+<tr><td><code>SUSTAIN</code></td><td>knob</td><td>0..1, default 0.6</td></tr>
+<tr><td><code>VOCT</code>, <code>GATE</code></td><td>inputs</td><td>1 V/octave pitch; gate high above 1 V</td></tr>
+<tr><td><code>OUT</code></td><td>output</td><td>audio</td></tr>
+</table>
+<pre><code>pt::BasicOscillator oscillator;
+pt::Svf filter;
+pt::Envelope envelope;
+float sampleRate = 48000.f;
+
+void onSampleRateChange(const SampleRateChangeEvent&amp; e) override {
+	sampleRate = e.sampleRate;
+	oscillator.init(sampleRate);
+	oscillator.setShape(pt::BasicOscillator::SAW);
+	filter.init(sampleRate);
+	envelope.init(sampleRate);
+}
+
+// A 0..1 knob to a time from 1 ms to 4 s. Exponential, so the short times
+// (where the ear notices small changes) get most of the knob's travel.
+static float knobToSeconds(float k) { return 0.001f * std::pow(4000.f, k); }
+
+void process(const ProcessArgs&amp; args) override {
+	// 1. Envelope. The setters are cheap, so read the knobs every sample.
+	envelope.setAdsr(knobToSeconds(params[ATTACK_PARAM].getValue()),
+	                 knobToSeconds(params[DECAY_PARAM].getValue()),
+	                 params[SUSTAIN_PARAM].getValue(),
+	                 knobToSeconds(params[RELEASE_PARAM].getValue()));
+	bool gate = inputs[GATE_INPUT].getVoltage() &gt;= 1.f;
+	float env = envelope.process(gate);   // 0..1
+
+	// 2. Oscillator: knob plus V/Oct input, both in octaves around C4.
+	oscillator.setFrequency(pt::voltToHz(params[FREQ_PARAM].getValue() + inputs[VOCT_INPUT].getVoltage()));
+	float saw = oscillator.process();
+
+	// 3. Filter. Cutoff knob plus the envelope, on a 0..1 scale mapped
+	//    exponentially to 20 Hz..20 kHz. Keep it below half the sample
+	//    rate, the highest frequency the filter can be tuned to.
+	float k = pt::clamp(params[CUTOFF_PARAM].getValue() + params[ENV_PARAM].getValue() * env, 0.f, 1.f);
+	float cutoff = std::fmin(20.f * std::pow(1000.f, k), 0.45f * sampleRate);
+	float q = 0.5f + 9.5f * params[RES_PARAM].getValue();   // 0.5 (no peak) .. 10 (ringing)
+	filter.setFrequency(cutoff, q);
+	float filtered = filter.process(saw).lp;
+
+	// 4. The envelope as a VCA, then ±1 to Rack's ±5 V.
+	outputs[OUT_OUTPUT].setVoltage(5.f * filtered * env);
+}</code></pre>
+<p><strong>Variations.</strong></p>
+<ul>
+  <li>For a pluck, use <code>envelope.setAd(attack, decay)</code>. It ignores how long the gate stays high.</li>
+  <li>For a louder, rounder resonance, put <code>pt::softClip()</code> after the filter: high <code>q</code> values can push the output above ±1.</li>
+  <li>For a softer, organic filter and VCA in one, replace steps 3 and 4 with a <a href="dynamics.html#dynamics-lpg">pt::LowPassGate</a>.</li>
+</ul>
+
+<!-- ===================================================================== -->
+<h2 id="toolkit-delay">A simple delay</h2>
+<p class="origin"><code>#include "pt/fx/delay_line.h"</code> · <code>"pt/filter/one_pole.h"</code> · <code>"pt/core/math.h"</code></p>
+<p>An echo with time, feedback and dry/wet mix controls.</p>
+<p><strong>How it works.</strong> A <a href="plumbing.html#fx-delay_line">pt::DelayLine</a> holds the last two seconds of sound. Each sample, the code reads the echo from <em>time</em> seconds ago, then writes the input plus some of that echo back in. The echo comes round again, quieter each time, which is what <em>feedback</em> means. Mix then blends the dry input with the echoes.</p>
+<table>
+<tr><th>Panel id</th><th>Kind</th><th>Range</th></tr>
+<tr><td><code>TIME</code></td><td>knob</td><td>0.01..2 seconds, default 0.4</td></tr>
+<tr><td><code>FEEDBACK</code></td><td>knob</td><td>0..1, default 0.4</td></tr>
+<tr><td><code>MIX</code></td><td>knob</td><td>0..1, default 0.3</td></tr>
+<tr><td><code>IN</code></td><td>input</td><td>audio</td></tr>
+<tr><td><code>OUT</code></td><td>output</td><td>audio</td></tr>
+</table>
+<pre><code>pt::DelayLine line;
+pt::OnePole timeSmoother;
+float sampleRate = 48000.f;
+
+void onSampleRateChange(const SampleRateChangeEvent&amp; e) override {
+	sampleRate = e.sampleRate;
+	line.init(size_t(2.f * sampleRate) + 4);   // 2 s, plus a few samples for interpolation
+	timeSmoother.init(sampleRate);
+	timeSmoother.setFrequency(3.f);
+}
+
+void process(const ProcessArgs&amp; args) override {
+	float in = inputs[IN_INPUT].getVoltage() / 5.f;   // ±5 V to ±1
+
+	// 1. Delay time, smoothed. A sudden jump in read position clicks; a
+	//    smoothed one glides, and the echoes bend in pitch like a tape
+	//    machine changing speed.
+	float time = timeSmoother.process(params[TIME_PARAM].getValue()).lp;
+	float delaySamples = pt::clamp(time * sampleRate, 1.f, 2.f * sampleRate);
+
+	// 2. Read the echo from the past.
+	float echo = line.readHermite(delaySamples);
+
+	// 3. Write the input plus some of the echo back in. Feedback is capped
+	//    below 1, so the echoes always die away, and softClip() keeps
+	//    loud repeats from growing without limit: they saturate instead.
+	float feedback = 0.95f * params[FEEDBACK_PARAM].getValue();
+	line.write(pt::softClip(in + feedback * echo));
+
+	// 4. Mix dry and wet, then ±1 back to ±5 V.
+	float out = pt::crossfade(in, echo, params[MIX_PARAM].getValue());
+	outputs[OUT_OUTPUT].setVoltage(5.f * out);
+}</code></pre>
+<p><strong>Variations.</strong></p>
+<ul>
+  <li>For darker repeats, like tape or an analogue delay, put a <a href="plumbing.html#filter-one_pole">pt::OnePole</a> low-pass in the feedback path. Each echo is then a little duller than the last.</li>
+  <li>For a tape wobble, add a slow <code>pt::SineOscillator</code> and a <code>pt::SmoothRandom</code> to <code>delaySamples</code>, a few milliseconds' worth each.</li>
+  <li>For stereo ping-pong, use two lines and feed each one's echo into the other.</li>
+</ul>
+
+</main>
+</div>
+</body>
+</html>

@@ -13,6 +13,7 @@
   <a href="index.html" class="here">Overview</a>
   <a href="setup.html">Getting started</a>
   <a href="tutorial.html">Tutorial</a>
+  <a href="toolkit.html">Toolkit</a>
   <a href="core.html">Core</a>
   <a href="physical.html">Physical models</a>
   <a href="dynamics.html">Dynamics</a>
@@ -32,7 +33,7 @@
 <p>Think of it as a lego set for new modules. Each component is one header containing one class: a resonator, a string, a reverb, a drum voice. It is not a way to rebuild Mutable modules: Rings, Clouds and Plaits already exist in Rack, and things Rack already does well, such as plain saw oscillators, are left out.</p>
 
 <h2>Using it in a Rack plugin</h2>
-<p>New to building Rack plugins? <a href="setup.html">Getting started</a> covers installing the tools and Rack SDK and building the example modules. Then the <a href="tutorial.html">tutorial</a> walks through building a module from scratch: a sawtooth oscillator into a low-pass filter.</p>
+<p>New to building Rack plugins? <a href="setup.html">Getting started</a> covers installing the tools and Rack SDK and building the example modules. Then the <a href="tutorial.html">tutorial</a> walks through building a module from scratch: a sawtooth oscillator into a low-pass filter. The <a href="toolkit.html">toolkit</a> has more worked examples: a sampler, a synth voice and a delay.</p>
 <p>The library is header-only. Point your plugin's <code>Makefile</code> at it:</p>
 <pre><code>FLAGS += -I../partials/include</code></pre>
 <p>Then include what you need. Every component follows the same pattern:</p>

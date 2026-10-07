@@ -13,6 +13,7 @@
   <a href="index.html">Overview</a>
   <a href="setup.html">Getting started</a>
   <a href="tutorial.html">Tutorial</a>
+  <a href="toolkit.html">Toolkit</a>
   <a href="core.html" class="here">Core</a>
   <a href="physical.html">Physical models</a>
   <a href="dynamics.html">Dynamics</a>
@@ -65,6 +66,7 @@ phase -= std::floor(phase);                    // keep it small for precision</c
 <p>Cubic interpolation through the four nearest points. It is smoother than linear and adds less high-frequency grit when a table is read slowly or sweeps. It needs one guard entry before the position and two after.</p>
 <pre><code>// Table with guard points: data[0] is a guard, data[1..N+1] the curve, data[N+2] a guard
 float y = pt::interpolateHermite(data + 1, x, float(N));</code></pre>
+<p>To record and play back a sample with it, like Pd's <code>tabwrite~</code> and <code>tabread4~</code>, see <a href="toolkit.html#toolkit-sampler">Recording and playing a sample</a> in the toolkit.</p>
 
 <h3 id="core-math-crossfade">crossfade(a, b, fade)</h3>
 <p>Linear blend: <code>fade</code> = 0 gives <code>a</code>, 1 gives <code>b</code>, 0.5 gives the average.</p>
