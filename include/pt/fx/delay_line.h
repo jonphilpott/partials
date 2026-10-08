@@ -40,6 +40,21 @@ class DelayLine {
     writeIndex_ = 0;
   }
 
+  // Zero buffer positions [begin, end), leaving the write position alone.
+  // reset() zeroes everything at once, which for a long delay (tens of MB)
+  // can take longer than one audio block and cause a dropout. Calling clear()
+  // a chunk at a time from process() spreads that work out instead:
+  //
+  //   line.clear(pos, pos + 1024); pos += 1024;   // until pos >= size()
+  //
+  // Positions are raw buffer indices (0 .. size()), not delays, so walking
+  // 0 .. size() in any chunk size wipes the whole line. `end` past size()
+  // is clamped.
+  void clear(size_t begin, size_t end) {
+    end = std::min(end, buffer_.size());
+    if (begin < end) std::fill(buffer_.begin() + begin, buffer_.begin() + end, 0.0f);
+  }
+
   // Usable delay in samples.
   size_t size() const { return buffer_.size(); }
 

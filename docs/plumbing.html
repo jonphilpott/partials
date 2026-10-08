@@ -117,6 +117,8 @@ outputs[OUT].setVoltage(5.f * dc.process(y));</code></pre>
 <tr><th>Call</th><th>Effect</th></tr>
 <tr><td><code>init(maxDelay)</code></td><td>Allocate room for up to <code>maxDelay</code> samples. The buffer is rounded up to a power of two.</td></tr>
 <tr><td><code>reset()</code></td><td>Clear to silence.</td></tr>
+<tr><td><code>clear(begin, end)</code></td><td>Zero buffer positions <code>begin</code> up to (not including) <code>end</code>, leaving the write position where it is. Positions are raw buffer indices from <code>0</code> to <code>size()</code>, not delays. An <code>end</code> past <code>size()</code> is clamped.</td></tr>
+<tr><td><code>size()</code></td><td>Buffer length in samples, after rounding up to a power of two.</td></tr>
 <tr><td><code>write(x)</code></td><td>Push one sample.</td></tr>
 <tr><td><code>read(size_t n)</code></td><td>The sample written <code>n</code> writes ago; <code>read(1)</code> is the latest.</td></tr>
 <tr><td><code>read(float d)</code></td><td>Fractional delay, linear interpolation. Cheap, slightly dull.</td></tr>
@@ -140,6 +142,21 @@ void process(const ProcessArgs&amp; args) override {
 float period = args.sampleRate / pt::voltToHz(inputs[VOCT].getVoltage());
 float y = in + 0.95f * comb.readHermite(period);
 comb.write(y);</code></pre>
+<p><strong>Wiping a long delay.</strong> <code>reset()</code> zeroes the whole buffer in one go. For a long line that can be tens of megabytes (30 seconds at 96 kHz is 16 MB), which can take longer than Rack gives one audio block, so you hear a dropout. Use <code>clear()</code> to spread the work over many <code>process()</code> calls, and mute the line's output until it finishes so the half-wiped audio stays silent:</p>
+<pre><code>size_t wipePos = SIZE_MAX;                     // SIZE_MAX = not wiping
+
+void onErase() { wipePos = 0; }
+
+void process(const ProcessArgs&amp; args) override {
+    bool wiping = wipePos &lt; line.size();
+    if (wiping) {
+        line.clear(wipePos, wipePos + 1024);   // ~4k samples per 4M-sample line
+        wipePos += 1024;
+    }
+    float echo = wiping ? 0.f : line.read(time * args.sampleRate);
+    line.write(in + feedback * echo);
+    ...
+}</code></pre>
 
 <!-- ===================================================================== -->
 <h2 id="osc-sine">Sine oscillators</h2>

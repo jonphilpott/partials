@@ -93,6 +93,20 @@ static void testPlumbing() {
   CHECK(d.read(static_cast<size_t>(1)) == 50.0f);
   CHECK(d.read(static_cast<size_t>(10)) == 41.0f);
   CHECK_NEAR(d.read(10.5f), 40.5f, 1e-6f);
+
+  // clear() zeroes a range of buffer positions and leaves the write head
+  // alone; clearing 0 .. size() in chunks wipes the line. End is clamped.
+  {
+    pt::DelayLine c;
+    c.init(100);
+    for (int i = 1; i <= 50; ++i) c.write(static_cast<float>(i));
+    for (size_t pos = 0; pos < c.size(); pos += 7) c.clear(pos, pos + 7);
+    bool silent = true;
+    for (size_t n = 1; n < c.size(); ++n) silent = silent && c.read(n) == 0.0f;
+    CHECK(silent);
+    c.write(1.0f);
+    CHECK(c.read(static_cast<size_t>(1)) == 1.0f);  // write position kept
+  }
   CHECK_NEAR(d.readHermite(10.5f), 40.5f, 1e-5f);  // exact on a ramp
 
   // DC blocker removes an offset.
