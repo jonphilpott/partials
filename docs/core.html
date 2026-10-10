@@ -74,6 +74,12 @@ float y = pt::interpolateHermite(data + 1, x, float(N));</code></pre>
 float mix = params[MIX].getValue();
 float out = pt::crossfade(dry, wet, mix);</code></pre>
 
+<h3 id="core-math-crossfadeEqualPower">crossfadeEqualPower(a, b, fade)</h3>
+<p>Like <code>crossfade</code>, but each side follows a quarter sine curve, so the total power stays steady through the middle. Use it to mix unrelated signals, such as dry and wet. A linear crossfade of those sounds about 3 dB quieter halfway. At 0.5 each side gets about 0.707, not 0.5.</p>
+<pre><code>// Dry/wet mix knob that doesn't dip in level halfway
+float mix = params[MIX].getValue();
+float out = pt::crossfadeEqualPower(dry, wet, mix);</code></pre>
+
 <h3 id="core-math-smoothStep">smoothStep(x)</h3>
 <p>S-shaped curve on 0..1: slow at both ends, fastest in the middle. Good for crossfades and morphs that shouldn't jump at the edges.</p>
 <pre><code>// Equal-feeling morph between two oscillators

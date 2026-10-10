@@ -24,6 +24,9 @@ int main() {
   CHECK_NEAR(pt::interpolateHermite(line + 1, 0.3f, 2.0f), 0.6f, 1e-6f);
 
   // softLimit hits ±1 at ±3; softClip holds there.
+  CHECK_NEAR(pt::crossfadeEqualPower(2.0f, 3.0f, 0.0f), 2.0f, 1e-6f);
+  CHECK_NEAR(pt::crossfadeEqualPower(2.0f, 3.0f, 1.0f), 3.0f, 1e-6f);
+  CHECK_NEAR(pt::crossfadeEqualPower(1.0f, 1.0f, 0.5f), std::sqrt(2.0f), 1e-6f);  // -3 dB each
   CHECK_NEAR(pt::softLimit(3.0f), 1.0f, 1e-6f);
   CHECK(pt::softClip(10.0f) == 1.0f);
   CHECK(pt::softClip(-10.0f) == -1.0f);

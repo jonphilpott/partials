@@ -70,6 +70,15 @@ inline float crossfade(float a, float b, float fade) {
   return a + (b - a) * fade;
 }
 
+// Equal-power blend: fade = 0 gives a, fade = 1 gives b. The gains follow a
+// quarter of a cosine and a sine, so their squares always sum to 1: the
+// total power stays constant, which suits uncorrelated signals such as dry
+// and wet. (A linear crossfade of those dips about 3 dB in the middle.)
+inline float crossfadeEqualPower(float a, float b, float fade) {
+  const float t = fade * 1.5707963f;  // fade * pi/2
+  return a * std::cos(t) + b * std::sin(t);
+}
+
 // S-shaped ease curve on 0..1 (zero slope at both ends).
 inline float smoothStep(float x) {
   return x * x * (3.0f - 2.0f * x);
