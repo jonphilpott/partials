@@ -1,17 +1,27 @@
 # Partials
 
-A library of reusable DSP components ported from bits and pieces used in Mutable Instrument's eurorack code (https://github.com/pichenettes/eurorack)
+A library of reusable DSP components ported from bits and pieces used
+in Mutable Instrument's eurorack code
+(https://github.com/pichenettes/eurorack)
 
-A pretty lazy Claude code project, *absolutely all credit goes to Emilie Gillet* (emilie.o.gillet@gmail.com) for this code - I simply asked claude to extract parts that would make sense as reusable components in order to make a general-purpose DSP library that could be used to build VCV rack modules. The library is designed to be _"include-only"_ to make integration as simple as possible.
+A pretty lazy Claude code project, *absolutely all credit goes to
+Emilie Gillet for code that was ported from their eurorack modules* -
+I simply asked claude to extract parts that would make sense as
+reusable components in order to make a general-purpose DSP library
+that could be used to build VCV rack modules. The library is designed
+to be _"include-only"_ to make integration as simple as possible.
 
-It's possible this library may grow in the future to include other useful DSP snippets for writing VCV rack modules, or code ported from my puredata projects.
+It's possible this library may grow in the future to include other
+useful DSP snippets for writing VCV rack modules, or code ported from
+my puredata projects.
 
 # License 
 
-MIT License
+Continuing the MIT License used by MI's `eurorack` modules.
 
-Derived from Mutable Instruments Eurorack firmware and stmlib,
-Copyright (c) 2012-2023 Emilie Gillet (emilie.o.gillet@gmail.com).
+Derived from Mutable Instruments Eurorack firmware and stmlib, those
+parts are Copyright (c) 2012-2023 Emilie Gillet
+(emilie.o.gillet@gmail.com).
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

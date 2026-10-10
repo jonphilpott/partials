@@ -159,6 +159,66 @@ void process(const ProcessArgs&amp; args) override {
 }</code></pre>
 
 <!-- ===================================================================== -->
+<h2 id="sample-audio_buffer">AudioBuffer</h2>
+<p class="origin"><code>#include "pt/sample/audio_buffer.h"</code> · new to partials</p>
+<p>Fixed-size audio storage you record into, load files into and play back at any speed. It is Pure Data's array: <code>write()</code> is <code>tabwrite~</code> and <code>read()</code> is <code>tabread4~</code>. Use it for samplers, loopers and anything that captures audio to manipulate later.</p>
+<p><strong>Memory.</strong> <code>init()</code> is the only call that allocates. Call it from <code>onSampleRateChange</code> or the interface thread, never from <code>process</code>.</p>
+<table>
+<tr><th>Call</th><th>Effect</th></tr>
+<tr><td><code>init(frames, channels = 1, sampleRate = 48000)</code></td><td>Allocate silence. The sample rate is the audio's own rate, used to play it at the right pitch.</td></tr>
+<tr><td><code>frames()</code>, <code>channels()</code>, <code>sampleRate()</code></td><td>Size and rate.</td></tr>
+<tr><td><code>write(c, frame, x)</code></td><td>Store one sample. Frames past the end are ignored.</td></tr>
+<tr><td><code>read(c, frame)</code></td><td>Hermite read at a fractional frame (a <code>double</code>). One-shot buffers clamp the position to the ends; looping ones wrap it.</td></tr>
+<tr><td><code>setLooping(loop)</code></td><td>One-shot (the default) or looping. Looping makes reads across the end and back to the start seamless, even while recording.</td></tr>
+<tr><td><code>clear(begin, end)</code></td><td>Zero frames <code>begin</code> up to (not including) <code>end</code> on every channel. Call it a chunk at a time to wipe a long buffer without a dropout, as with <code>DelayLine::clear()</code>.</td></tr>
+<tr><td><code>channel(c)</code></td><td>Pointer to frame 0 of a channel, for bulk work. Call <code>setLooping()</code> again afterwards to refresh the loop points.</td></tr>
+</table>
+<p>Channel numbers past the last read the last channel, so a mono buffer plays as both left and right. Positions are in frames, as in <code>tabread4~</code>.</p>
+<pre><code>pt::AudioBuffer buffer;
+double playPos = 0.0;     // double: a float loses sub-frame accuracy on long samples
+
+void onSampleRateChange(const SampleRateChangeEvent&amp; e) override {
+    buffer.init(size_t(4.f * e.sampleRate), 1, e.sampleRate);   // 4 seconds
+    buffer.setLooping(true);
+}
+
+void process(const ProcessArgs&amp; args) override {
+    // sampleRate() / host rate keeps a sample recorded or loaded at another
+    // rate at its original pitch.
+    playPos += params[SPEED].getValue() * buffer.sampleRate() / args.sampleRate;
+    outputs[OUT].setVoltage(5.f * buffer.read(0, playPos));
+}</code></pre>
+<p><strong>Why the position is a double.</strong> A <code>float</code> holds 24 bits of precision. At frame 480,000 (10 seconds at 48 kHz) its smallest step is 1/32 of a frame, which roughens slow playback of long samples. A <code>double</code> stays accurate to well under a frame for hours of audio.</p>
+
+<!-- ===================================================================== -->
+<h2 id="sample-wav">WAV files</h2>
+<p class="origin"><code>#include "pt/sample/wav.h"</code> · new to partials</p>
+<p>Loads a WAV file into an <code>AudioBuffer</code>, like Pd's <code>soundfiler read</code>. The buffer takes the file's length, channel count and sample rate, and starts one-shot.</p>
+<table>
+<tr><th>Call</th><th>Effect</th></tr>
+<tr><td><code>decodeWav(bytes, size, buffer)</code></td><td>Decode a whole file already in memory. Returns <code>false</code>, leaving the buffer untouched, if it isn't a WAV file or uses an unsupported format.</td></tr>
+<tr><td><code>loadWav(path, buffer)</code></td><td>Read the file with <code>std::fopen</code>, then decode it.</td></tr>
+</table>
+<p><strong>Formats.</strong> Integer PCM at 8, 16, 24 and 32 bits; float at 32 and 64 bits; any channel count; plain and "extensible" headers. Not compressed WAV (ADPCM, mu-law), AIFF or FLAC. Samples always come out as floats from -1 to +1.</p>
+<p><strong>In Rack</strong>, load from the interface thread (a menu item), never from <code>process()</code>, since decoding allocates the buffer. Read the file with Rack's <code>system::readFile()</code> rather than <code>loadWav()</code>: on Windows, <code>fopen</code> can't open paths with non-ASCII characters. Then hand the finished buffer to the audio thread by swapping a pointer, so <code>process()</code> never sees a half-loaded buffer:</p>
+<pre><code>std::shared_ptr&lt;pt::AudioBuffer&gt; sample;   // what process() plays
+
+// Interface thread, e.g. a "Load sample..." menu item.
+void loadSample(const std::string&amp; path) {
+    std::vector&lt;uint8_t&gt; bytes = system::readFile(path);
+    auto fresh = std::make_shared&lt;pt::AudioBuffer&gt;();
+    if (!pt::decodeWav(bytes.data(), bytes.size(), *fresh)) return;
+    std::atomic_store(&amp;sample, fresh);   // the swap: process() sees old or new, never half
+}
+
+void process(const ProcessArgs&amp; args) override {
+    std::shared_ptr&lt;pt::AudioBuffer&gt; s = std::atomic_load(&amp;sample);
+    if (!s) return;
+    ...
+}</code></pre>
+<p>The old buffer is freed when the last <code>shared_ptr</code> to it goes away. That is usually on the audio thread, the next time <code>process()</code> runs, and freeing a few megabytes there is quick enough in practice. To keep it off the audio thread entirely, hold on to the old pointer in the loader until the next load.</p>
+
+<!-- ===================================================================== -->
 <h2 id="osc-sine">Sine oscillators</h2>
 <p class="origin"><code>#include "pt/osc/sine.h"</code> · SineOscillator from Plaits, CosineOscillator from stmlib</p>
 

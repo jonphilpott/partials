@@ -66,6 +66,8 @@
 #include "pt/physical/plucker.h"
 #include "pt/physical/string.h"
 #include "pt/physical/tube.h"
+#include "pt/sample/audio_buffer.h"
+#include "pt/sample/wav.h"
 #include "pt/spectral/fm_operators.h"
 #include "pt/spectral/vocoder.h"
 #include "pt/spectral/xmod.h"

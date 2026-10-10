@@ -34,9 +34,9 @@
 
 <!-- ===================================================================== -->
 <h2 id="toolkit-sampler">Recording and playing a sample</h2>
-<p class="origin"><code>#include "pt/core/math.h"</code> · <code>#include &lt;vector&gt;</code></p>
+<p class="origin"><code>#include "pt/sample/audio_buffer.h"</code></p>
 <p>Records an input into memory, then plays it back in a loop at any speed, including backwards. This is what Pure Data does with <code>tabwrite~</code> and <code>tabread4~</code>.</p>
-<p><strong>How it works.</strong> partials has no table class: a <code>std::vector&lt;float&gt;</code> is the table. Recording writes one sample per call and moves on. Playback moves a read position by <em>speed</em> samples per call. Because the speed need not be a whole number, the position usually falls between two samples, so <a href="core.html#core-math-interpolateHermite">interpolateHermite()</a> draws a smooth curve through the four nearest samples and reads the value in between.</p>
+<p><strong>How it works.</strong> An <a href="plumbing.html#sample-audio_buffer">AudioBuffer</a> holds the recording. Recording writes one sample per call and moves on. Playback moves a read position by <em>speed</em> samples per call. Because the speed need not be a whole number, the position usually falls between two samples, so <code>read()</code> draws a smooth curve through the four nearest samples and reads the value in between. To play a WAV file instead of a recording, load it with <a href="plumbing.html#sample-wav">decodeWav()</a>.</p>
 <table>
 <tr><th>Panel id</th><th>Kind</th><th>Range</th></tr>
 <tr><td><code>RECORD</code></td><td>button (<code>VCVButton</code>)</td><td>held to record</td></tr>
@@ -44,45 +44,40 @@
 <tr><td><code>IN</code></td><td>input</td><td>audio</td></tr>
 <tr><td><code>OUT</code></td><td>output</td><td>audio</td></tr>
 </table>
-<pre><code>std::vector&lt;float&gt; table;   // the recording
-size_t length = 0;          // samples recorded so far
-float readPos = 1.f;        // playback position, in samples
+<pre><code>pt::AudioBuffer buffer;     // the recording
+size_t length = 0;          // frames recorded so far
+double readPos = 0.0;       // playback position, in frames
 bool wasRecording = false;
 
 void onSampleRateChange(const SampleRateChangeEvent&amp; e) override {
 	// Room for 4 seconds. Allocate here, never in process(): asking for
 	// memory on the audio thread can take long enough to cause a dropout.
-	table.assign(size_t(4.f * e.sampleRate), 0.f);
+	buffer.init(size_t(4.f * e.sampleRate), 1, e.sampleRate);
 	length = 0;
 }
 
 void process(const ProcessArgs&amp; args) override {
 	// 1. Record (tabwrite~). Pressing the button starts a new recording
-	//    from the beginning; holding it keeps recording until the table is full.
+	//    from the beginning; holding it keeps recording until the buffer is full.
 	bool recording = params[RECORD_PARAM].getValue() &gt; 0.5f;
 	if (recording &amp;&amp; !wasRecording) length = 0;
 	wasRecording = recording;
-	if (recording &amp;&amp; length &lt; table.size())
-		table[length++] = inputs[IN_INPUT].getVoltage();
+	if (recording &amp;&amp; length &lt; buffer.frames())
+		buffer.write(0, length++, inputs[IN_INPUT].getVoltage());
 
-	// Hermite reads one sample before the position and two after,
-	// so playback needs at least 4 samples to work with.
-	if (length &lt; 4) {
+	if (length == 0) {
 		outputs[OUT_OUTPUT].setVoltage(0.f);
 		return;
 	}
 
 	// 2. Move the read head. 1 = original speed, 0.5 = an octave down,
-	//    -1 = backwards. Keep it between 1 and length - 2 so all four
-	//    samples it reads exist, wrapping at either end to loop.
-	float start = 1.f, end = float(length - 2);
+	//    -1 = backwards. Wrap at either end of the recording to loop.
 	readPos += params[SPEED_PARAM].getValue();
-	if (readPos &gt;= end) readPos -= end - start;
-	if (readPos &lt; start) readPos += end - start;
+	if (readPos &gt;= length) readPos -= length;
+	if (readPos &lt; 0.0) readPos += length;
 
-	// 3. Play back (tabread4~). size = 1 means readPos counts samples
-	//    rather than running 0..1.
-	outputs[OUT_OUTPUT].setVoltage(pt::interpolateHermite(table.data(), readPos, 1.f));
+	// 3. Play back (tabread4~).
+	outputs[OUT_OUTPUT].setVoltage(buffer.read(0, readPos));
 }</code></pre>
 <p><strong>Notes.</strong></p>
 <ul>
